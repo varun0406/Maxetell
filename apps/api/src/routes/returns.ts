@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Db } from "../db.js";
+import { recalcReceived } from "./purchase.js";
 
 const CreateSalesReturn = z.object({
   order_id: z.coerce.number().int().positive(),
@@ -163,6 +164,7 @@ export async function registerReturnsRoutes(app: FastifyInstance, opts: { db: Db
     db.prepare(
       `INSERT INTO purchase_returns(purchase_entry_id, return_date, weight, note) VALUES (?,?,?,?)`,
     ).run(body.purchase_entry_id, body.return_date, body.weight, body.note ?? null);
+    recalcReceived(db, body.purchase_entry_id);
     return { data: { success: true } };
   });
 
@@ -191,15 +193,19 @@ export async function registerReturnsRoutes(app: FastifyInstance, opts: { db: Db
       binds[k] = v ?? null;
     }
     db.prepare(`UPDATE purchase_returns SET ${fields.join(", ")} WHERE id = @id`).run(binds);
+    recalcReceived(db, existing.purchase_entry_id);
     return { data: { success: true } };
   });
 
   app.delete("/returns/purchase/:id", async (req, reply) => {
     const id = Number((req.params as { id: string }).id);
     if (!Number.isFinite(id)) return reply.code(400).send({ error: "Invalid id" });
-    const existing = db.prepare(`SELECT id FROM purchase_returns WHERE id = ?`).get(id);
+    const existing = db.prepare(`SELECT id, purchase_entry_id FROM purchase_returns WHERE id = ?`).get(id) as
+      | { id: number; purchase_entry_id: number }
+      | undefined;
     if (!existing) return reply.code(404).send({ error: "Not found" });
     db.prepare(`DELETE FROM purchase_returns WHERE id = ?`).run(id);
+    recalcReceived(db, existing.purchase_entry_id);
     return { data: { success: true } };
   });
 }

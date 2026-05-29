@@ -99,12 +99,17 @@ function ledgerRow(db: Db, id: number) {
     .get(id) as Record<string, unknown>;
 }
 
-function recalcReceived(db: Db, purchaseEntryId: number) {
-  const row = db
+export function recalcReceived(db: Db, purchaseEntryId: number) {
+  const receipts = db
     .prepare(`SELECT COALESCE(SUM(weight_received),0) AS s FROM purchase_receipts WHERE purchase_entry_id = ?`)
     .get(purchaseEntryId) as { s: number };
-  db.prepare(`UPDATE purchase_entries SET received_weight = ? WHERE id = ?`).run(row.s, purchaseEntryId);
+  const returns = db
+    .prepare(`SELECT COALESCE(SUM(weight),0) AS s FROM purchase_returns WHERE purchase_entry_id = ?`)
+    .get(purchaseEntryId) as { s: number };
+  const netReceived = Math.max(0, receipts.s - returns.s);
+  db.prepare(`UPDATE purchase_entries SET received_weight = ? WHERE id = ?`).run(netReceived, purchaseEntryId);
 }
+
 
 function resolveSupplierId(db: Db, name: string) {
   const existing = db.prepare(`SELECT id FROM suppliers WHERE name = ?`).get(name) as { id: number } | undefined;
@@ -341,6 +346,15 @@ LIMIT 500
       });
     }
 
+    const returnsTotal = db
+      .prepare(`SELECT COALESCE(SUM(weight),0) AS s FROM purchase_returns WHERE purchase_entry_id = ?`)
+      .get(existing.purchase_entry_id) as { s: number };
+    if (sumOther.s + nextWeight < returnsTotal.s - 0.0001) {
+      return reply.code(400).send({
+        error: `Total received weight cannot fall below total returned weight (${returnsTotal.s} kg)`,
+      });
+    }
+
     const fields: string[] = [];
     const binds: Record<string, unknown> = { id: receiptId };
     for (const [k, v] of Object.entries(body)) {
@@ -360,6 +374,20 @@ LIMIT 500
       .prepare(`SELECT id, purchase_entry_id FROM purchase_receipts WHERE id = ?`)
       .get(receiptId) as { id: number; purchase_entry_id: number } | undefined;
     if (!existing) return reply.code(404).send({ error: "Receipt not found" });
+
+    const sumOther = db
+      .prepare(`SELECT COALESCE(SUM(weight_received),0) AS s FROM purchase_receipts WHERE purchase_entry_id = ? AND id <> ?`)
+      .get(existing.purchase_entry_id, receiptId) as { s: number };
+
+    const returnsTotal = db
+      .prepare(`SELECT COALESCE(SUM(weight),0) AS s FROM purchase_returns WHERE purchase_entry_id = ?`)
+      .get(existing.purchase_entry_id) as { s: number };
+
+    if (sumOther.s < returnsTotal.s - 0.0001) {
+      return reply.code(400).send({
+        error: `Cannot delete receipt because remaining received weight (${sumOther.s} kg) would fall below returned weight (${returnsTotal.s} kg)`,
+      });
+    }
 
     db.prepare(`DELETE FROM purchase_receipts WHERE id = ?`).run(receiptId);
     recalcReceived(db, existing.purchase_entry_id);

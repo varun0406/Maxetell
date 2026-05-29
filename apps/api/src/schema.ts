@@ -277,7 +277,8 @@ AND NOT EXISTS (SELECT 1 FROM purchase_receipts r WHERE r.purchase_entry_id = pu
 `);
   db.exec(`
 UPDATE purchase_entries SET received_weight = (
-  SELECT COALESCE(SUM(weight_received), 0) FROM purchase_receipts pr WHERE pr.purchase_entry_id = purchase_entries.id
+  COALESCE((SELECT SUM(weight_received) FROM purchase_receipts pr WHERE pr.purchase_entry_id = purchase_entries.id), 0) -
+  COALESCE((SELECT SUM(weight) FROM purchase_returns pr WHERE pr.purchase_entry_id = purchase_entries.id), 0)
 ) WHERE EXISTS (SELECT 1 FROM purchase_receipts r2 WHERE r2.purchase_entry_id = purchase_entries.id);
 `);
 }
