@@ -93,8 +93,12 @@ export async function registerDispatchRoutes(app: FastifyInstance, opts: { db: D
 
     const rows = db
       .prepare(
-        `SELECT id, dispatch_date, dispatch_weight, dispatch_pcs, bundle_no, transport, created_at
-         FROM dispatch_entries WHERE order_id = ? ORDER BY dispatch_date DESC, id DESC`,
+        `SELECT de.id, de.order_id, de.order_line_item_id, de.dispatch_date, de.dispatch_weight, de.dispatch_pcs, de.bundle_no, de.transport, de.created_at,
+                oli.item, oli.size, oli.grade
+         FROM dispatch_entries de
+         LEFT JOIN order_line_items oli ON oli.id = de.order_line_item_id
+         WHERE de.order_id = ?
+         ORDER BY de.dispatch_date DESC, de.id DESC`,
       )
       .all(orderId);
     const bills = db
@@ -162,8 +166,12 @@ export async function registerDispatchRoutes(app: FastifyInstance, opts: { db: D
     if (!Number.isFinite(lineId)) return reply.code(400).send({ error: "Invalid line id" });
     const rows = db
       .prepare(
-        `SELECT id, dispatch_date, dispatch_weight, dispatch_pcs, bundle_no, transport, created_at
-         FROM dispatch_entries WHERE order_line_item_id = ? ORDER BY dispatch_date DESC, id DESC`,
+        `SELECT de.id, de.order_id, de.order_line_item_id, de.dispatch_date, de.dispatch_weight, de.dispatch_pcs, de.bundle_no, de.transport, de.created_at,
+                oli.item, oli.size, oli.grade
+         FROM dispatch_entries de
+         LEFT JOIN order_line_items oli ON oli.id = de.order_line_item_id
+         WHERE de.order_line_item_id = ?
+         ORDER BY de.dispatch_date DESC, de.id DESC`,
       )
       .all(lineId);
     const bills = db
