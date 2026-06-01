@@ -6,14 +6,16 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   CircularProgress,
+  FormControlLabel,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
 import dayjs from "dayjs";
-import { createDispatchForLine, fetchDispatchForLine, fetchOrders } from "../lib/api";
+import { createDispatchForLine, fetchDispatch, fetchDispatchForLine, fetchOrders } from "../lib/api";
 import type { DispatchEntry, OrderRow } from "../lib/api";
 
 export function DispatchPage() {
@@ -33,6 +35,7 @@ export function DispatchPage() {
   const [bundleNo, setBundleNo] = useState("");
   const [transport, setTransport] = useState("");
   const [tallyBillsInput, setTallyBillsInput] = useState("");
+  const [retainDetails, setRetainDetails] = useState(true);
 
   const [entries, setEntries] = useState<DispatchEntry[]>([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
@@ -48,16 +51,16 @@ export function DispatchPage() {
   }, []);
 
   useEffect(() => {
-    if (!order) {
+    if (!selectedWO) {
       setEntries([]);
       return;
     }
     setLoadingEntries(true);
-    fetchDispatchForLine(order.id)
+    fetchDispatch(selectedWO.order_id)
       .then(setEntries)
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Failed to load dispatch entries"))
       .finally(() => setLoadingEntries(false));
-  }, [order]);
+  }, [selectedWO]);
 
   const uniqueWorkOrders = useMemo(() => {
     const seen = new Set<string>();
@@ -89,16 +92,20 @@ export function DispatchPage() {
 
   const helper = useMemo(() => {
     if (!order) return null;
-    const dispatched = entries.reduce((s, e) => s + (Number(e.dispatch_weight) || 0), 0);
+    const dispatched = entries
+      .filter((e) => e.order_line_item_id === order.id)
+      .reduce((s, e) => s + (Number(e.dispatch_weight) || 0), 0);
     const bal = Math.max(0, Number(order.order_kgs) - dispatched);
     const maxAllowed = Number(order.order_kgs) + 300;
-    const dispatchedPcsSum = entries.reduce((s, e) => s + (Number(e.dispatch_pcs) || 0), 0);
+    const dispatchedPcsSum = entries
+      .filter((e) => e.order_line_item_id === order.id)
+      .reduce((s, e) => s + (Number(e.dispatch_pcs) || 0), 0);
     const balPcs = Math.max(0, Number(order.order_pcs || 0) - dispatchedPcsSum);
     return `Line ordered: ${Math.round(order.order_kgs)} kg / ${Math.round(order.order_pcs || 0)} pcs • Dispatched (this line): ${Math.round(dispatched)} kg / ${Math.round(dispatchedPcsSum)} pcs • Balance: ${Math.round(bal)} kg / ${Math.round(balPcs)} pcs • Max allowed: ${Math.round(maxAllowed)} kg`;
   }, [order, entries]);
 
   async function submit() {
-    if (!order) return;
+    if (!order || !selectedWO) return;
     setSaving(true);
     setErr(null);
     try {
@@ -123,13 +130,15 @@ export function DispatchPage() {
       });
 
       setOrder(updated.find(u => u.id === order.id) ?? updated[0] ?? order);
-      const list = await fetchDispatchForLine(order.id);
+      const list = await fetchDispatch(selectedWO.order_id);
       setEntries(list);
       setDispatchWeight(0);
       setDispatchPcs(0);
       setBundleNo("");
-      setTransport("");
-      setTallyBillsInput("");
+      if (!retainDetails) {
+        setTransport("");
+        setTallyBillsInput("");
+      }
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to save");
     } finally {
@@ -335,11 +344,23 @@ export function DispatchPage() {
               />
             </Stack>
 
-            <Box>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center" justifyContent="space-between">
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={retainDetails}
+                    onChange={(e) => setRetainDetails(e.target.checked)}
+                    color="primary"
+                    disabled={!order || saving}
+                  />
+                }
+                label="Retain date, transport & bills after save"
+                sx={{ userSelect: "none" }}
+              />
               <Button variant="contained" disabled={!order || saving || dispatchWeight <= 0} onClick={submit}>
                 {saving ? "Saving…" : "Add dispatch"}
               </Button>
-            </Box>
+            </Stack>
           </Stack>
         </CardContent>
       </Card>
@@ -347,12 +368,12 @@ export function DispatchPage() {
       <Card>
         <CardContent>
           <Typography fontWeight={800} sx={{ mb: 1.5 }}>
-            Recent dispatch entries {order ? `(for ${order.item} ${order.size} ${order.grade})` : ""}
+            Recent dispatch entries {selectedWO ? `(for Work Order: ${selectedWO.wo_no})` : ""}
           </Typography>
           {loadingEntries ? (
             <CircularProgress size={22} />
-          ) : !order ? (
-            <Typography color="text.secondary">Select a line item to view its recent dispatches.</Typography>
+          ) : !selectedWO ? (
+            <Typography color="text.secondary">Select a Work Order to view its recent dispatches.</Typography>
           ) : entries.length === 0 ? (
             <Typography color="text.secondary">No dispatch entries yet.</Typography>
           ) : (
@@ -363,21 +384,52 @@ export function DispatchPage() {
                   sx={{
                     display: "flex",
                     justifyContent: "space-between",
+                    alignItems: "center",
                     border: "1px solid rgba(15,23,42,0.08)",
                     borderRadius: 2,
                     px: 1.5,
                     py: 1,
+                    gap: 1.5,
                   }}
                 >
-                  <Typography fontWeight={700}>{e.dispatch_date}</Typography>
-                  <Typography>
+                  <Box sx={{ minWidth: 140 }}>
+                    <Typography fontWeight={700} variant="body2">{e.dispatch_date}</Typography>
+                    {e.item && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        {e.item} {e.size} {e.grade}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Typography variant="body2">
                     {Math.round(e.dispatch_weight)} kg / {Math.round(e.dispatch_pcs || 0)} pcs
                   </Typography>
-                  <Typography color="text.secondary">{e.bundle_no ?? "—"}</Typography>
-                  <Typography color="text.secondary">{e.transport ?? "—"}</Typography>
-                  <Typography color="text.secondary" sx={{ textAlign: "right" }}>
+                  <Typography color="text.secondary" variant="body2">{e.bundle_no ?? "—"}</Typography>
+                  <Typography color="text.secondary" variant="body2">{e.transport ?? "—"}</Typography>
+                  <Typography color="text.secondary" variant="body2" sx={{ flexGrow: 1, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                     {e.tally_bill_nos && e.tally_bill_nos.length ? e.tally_bill_nos.join(", ") : "—"}
                   </Typography>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    sx={{ textTransform: "none", py: 0.25, px: 1, fontSize: "0.75rem" }}
+                    onClick={() => {
+                      setDispatchDate(e.dispatch_date);
+                      setDispatchWeight(e.dispatch_weight);
+                      setDispatchPcs(e.dispatch_pcs);
+                      setBundleNo(e.bundle_no || "");
+                      setTransport(e.transport || "");
+                      setTallyBillsInput(e.tally_bill_nos?.join(", ") || "");
+
+                      if (e.order_line_item_id) {
+                        const targetLine = orders.find(o => o.id === e.order_line_item_id);
+                        if (targetLine) {
+                          setOrder(targetLine);
+                        }
+                      }
+                    }}
+                  >
+                    Duplicate
+                  </Button>
                 </Box>
               ))}
             </Box>
