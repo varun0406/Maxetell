@@ -15,7 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import dayjs from "dayjs";
-import { createDispatchForLine, fetchDispatch, fetchOrders } from "../lib/api";
+import { createDispatchForLine, deleteDispatch, fetchDispatch, fetchOrders } from "../lib/api";
 import type { DispatchEntry, OrderRow } from "../lib/api";
 
 export function DispatchPage() {
@@ -408,28 +408,63 @@ export function DispatchPage() {
                   <Typography color="text.secondary" variant="body2" sx={{ flexGrow: 1, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                     {e.tally_bill_nos && e.tally_bill_nos.length ? e.tally_bill_nos.join(", ") : "—"}
                   </Typography>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    sx={{ textTransform: "none", py: 0.25, px: 1, fontSize: "0.75rem" }}
-                    onClick={() => {
-                      setDispatchDate(e.dispatch_date);
-                      setDispatchWeight(e.dispatch_weight);
-                      setDispatchPcs(e.dispatch_pcs);
-                      setBundleNo(e.bundle_no || "");
-                      setTransport(e.transport || "");
-                      setTallyBillsInput(e.tally_bill_nos?.join(", ") || "");
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      sx={{ textTransform: "none", py: 0.25, px: 1, fontSize: "0.75rem" }}
+                      onClick={() => {
+                        setDispatchDate(e.dispatch_date);
+                        setDispatchWeight(e.dispatch_weight);
+                        setDispatchPcs(e.dispatch_pcs);
+                        setBundleNo(e.bundle_no || "");
+                        setTransport(e.transport || "");
+                        setTallyBillsInput(e.tally_bill_nos?.join(", ") || "");
 
-                      if (e.order_line_item_id) {
-                        const targetLine = orders.find(o => o.id === e.order_line_item_id);
-                        if (targetLine) {
-                          setOrder(targetLine);
+                        if (e.order_line_item_id) {
+                          const targetLine = orders.find(o => o.id === e.order_line_item_id);
+                          if (targetLine) {
+                            setOrder(targetLine);
+                          }
                         }
-                      }
-                    }}
-                  >
-                    Duplicate
-                  </Button>
+                      }}
+                    >
+                      Duplicate
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      sx={{ textTransform: "none", py: 0.25, px: 1, fontSize: "0.75rem" }}
+                      onClick={async () => {
+                        if (window.confirm("Are you sure you want to delete this dispatch entry?")) {
+                          try {
+                            const updated = await deleteDispatch(e.id);
+                            setOrders((prev) => {
+                              return prev.map((oldRow) => {
+                                const matchingUpdated = updated.find((u) => u.id === oldRow.id);
+                                return matchingUpdated ? matchingUpdated : oldRow;
+                              });
+                            });
+                            if (order) {
+                              const updatedOrder = updated.find((u) => u.id === order.id);
+                              if (updatedOrder) {
+                                setOrder(updatedOrder);
+                              }
+                            }
+                            if (selectedWO) {
+                              const list = await fetchDispatch(selectedWO.order_id);
+                              setEntries(list);
+                            }
+                          } catch (err: unknown) {
+                            setErr(err instanceof Error ? err.message : "Failed to delete dispatch");
+                          }
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </Stack>
                 </Box>
               ))}
             </Box>
