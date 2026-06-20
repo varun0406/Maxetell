@@ -187,7 +187,7 @@ export function OrdersPage() {
     try {
       const updated = await patchOrder(orderId, body);
       setRows((prev) => mergeOrderRows(prev, updated));
-      setSelected((prev) => {
+      setSelected((prev: OrderRow | null) => {
         if (!prev) return prev;
         const u = updated.find((x) => x.id === prev.id);
         return u ?? prev;
@@ -202,7 +202,7 @@ export function OrdersPage() {
     try {
       const updated = await patchOrderMeta(orderId, body);
       setRows((prev) => mergeOrderRows(prev, updated));
-      setSelected((prev) => {
+      setSelected((prev: OrderRow | null) => {
         if (!prev) return prev;
         const u = updated.find((x) => x.id === prev.id);
         return u ?? prev;
@@ -217,7 +217,7 @@ export function OrdersPage() {
     try {
       const updated = await patchOrderLine(lineId, body);
       setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-      setSelected((prev) => (prev && prev.id === lineId ? updated : prev));
+      setSelected((prev: OrderRow | null) => (prev && prev.id === lineId ? updated : prev));
     } finally {
       setSaving(false);
     }
@@ -240,7 +240,7 @@ export function OrdersPage() {
       });
       setDispatchEntries(await fetchDispatchForLine(selected.id));
       setRows((prev) => mergeOrderRows(prev, updated));
-      setSelected((prev) => {
+      setSelected((prev: OrderRow | null) => {
         if (!prev) return prev;
         const u = updated.find((x) => x.id === prev.id);
         return u ?? updated[0] ?? prev;
@@ -266,7 +266,7 @@ export function OrdersPage() {
       });
       setPaymentEntries(await fetchPayments(selected.order_id));
       setRows((prev) => mergeOrderRows(prev, updated));
-      setSelected((prev) => {
+      setSelected((prev: OrderRow | null) => {
         if (!prev) return prev;
         const u = updated.find((x) => x.id === prev.id);
         return u ?? updated[0] ?? prev;

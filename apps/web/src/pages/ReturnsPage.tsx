@@ -30,11 +30,13 @@ export function ReturnsPage() {
   const [purchaseReturns, setPurchaseReturns] = useState<PurchaseReturnRow[]>([]);
 
   const [salesOrderId, setSalesOrderId] = useState<number>(0);
+  const [salesDate, setSalesDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [salesWeight, setSalesWeight] = useState<number>(0);
   const [salesNote, setSalesNote] = useState("");
   const [salesRemarks, setSalesRemarks] = useState("");
 
   const [poId, setPoId] = useState<number>(0);
+  const [poDate, setPoDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [poWeight, setPoWeight] = useState<number>(0);
   const [poNote, setPoNote] = useState("");
   const [poRemarks, setPoRemarks] = useState("");
