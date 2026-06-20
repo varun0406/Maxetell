@@ -50,6 +50,7 @@ export function OrderEntryPage() {
   const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [client, setClient] = useState<MasterClient | null>(null);
   const [clientText, setClientText] = useState("");
+  const [remarks, setRemarks] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
 
   const [created, setCreated] = useState<OrderRow[] | null>(null);
@@ -110,10 +111,12 @@ export function OrderEntryPage() {
         wo_no: woNo.trim(),
         order_date: date,
         client_name: resolvedClientName,
+        remarks: remarks.trim() || undefined,
         lines: clean,
       });
       setCreated(rows);
       setWoNo("");
+      setRemarks("");
       setLines([emptyLine()]);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to create order");
@@ -177,6 +180,14 @@ export function OrderEntryPage() {
               getOptionLabel={(o) => (typeof o === "string" ? o : o.name)}
               renderInput={(params) => <TextField {...params} label="Client name" placeholder="Type or select" />}
               freeSolo
+            />
+            
+            <TextField
+              label="Remarks"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Optional remarks"
+              fullWidth
             />
 
             <Stack direction="row" justifyContent="space-between" alignItems="center">

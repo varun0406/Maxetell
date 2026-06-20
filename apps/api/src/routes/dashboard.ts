@@ -90,4 +90,57 @@ FROM order_line_items oli
       },
     };
   });
+
+  app.get("/dashboard/analytics", async () => {
+    // Average purchase price overall
+    const avgPurchasePriceRow = db.prepare(`SELECT SUM(weight * rate) / SUM(weight) as avg FROM purchase_entries WHERE weight > 0`).get() as { avg: number | null };
+    const avgPurchasePrice = avgPurchasePriceRow?.avg || 0;
+
+    // Monthly summary
+    const monthlySummary = db.prepare(`
+      SELECT 
+        month,
+        SUM(sales_weight) as sales_weight,
+        SUM(sales_amount) as sales_amount,
+        SUM(purchase_weight) as purchase_weight,
+        SUM(purchase_amount) as purchase_amount,
+        SUM(sales_return_weight) as sales_return_weight,
+        SUM(purchase_return_weight) as purchase_return_weight
+      FROM (
+        SELECT strftime('%Y-%m', dispatch_date) as month, dispatch_weight as sales_weight, (dispatch_weight * COALESCE(sales_rate, 0)) as sales_amount, 0 as purchase_weight, 0 as purchase_amount, 0 as sales_return_weight, 0 as purchase_return_weight FROM dispatch_entries
+        UNION ALL
+        SELECT strftime('%Y-%m', pr.receipt_date) as month, 0, 0, pr.weight_received, pr.weight_received * COALESCE(pe.rate, 0), 0, 0 
+          FROM purchase_receipts pr JOIN purchase_entries pe ON pr.purchase_entry_id = pe.id
+        UNION ALL
+        SELECT strftime('%Y-%m', return_date) as month, 0, 0, 0, 0, weight, 0 FROM sales_returns
+        UNION ALL
+        SELECT strftime('%Y-%m', return_date) as month, 0, 0, 0, 0, 0, weight FROM purchase_returns
+      ) 
+      WHERE month IS NOT NULL
+      GROUP BY month 
+      ORDER BY month DESC
+      LIMIT 12
+    `).all() as any[];
+
+    // Quarterly sales price
+    const quarterlySales = db.prepare(`
+      SELECT 
+        strftime('%Y', dispatch_date) || '-Q' || ((cast(strftime('%m', dispatch_date) as integer) + 2) / 3) as quarter,
+        SUM(dispatch_weight) as sales_weight,
+        SUM(dispatch_weight * COALESCE(sales_rate, 0)) as sales_amount
+      FROM dispatch_entries
+      WHERE dispatch_date IS NOT NULL
+      GROUP BY quarter
+      ORDER BY quarter DESC
+      LIMIT 8
+    `).all() as any[];
+
+    return {
+      data: {
+        avg_purchase_price: avgPurchasePrice,
+        monthly_summary: monthlySummary,
+        quarterly_sales: quarterlySales
+      }
+    };
+  });
 }

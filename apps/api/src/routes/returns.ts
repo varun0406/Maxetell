@@ -8,12 +8,14 @@ const CreateSalesReturn = z.object({
   return_date: z.string().min(10),
   weight: z.coerce.number().positive(),
   note: z.string().trim().optional(),
+  remarks: z.string().optional().nullable(),
 });
 
 const PatchSalesReturn = z.object({
   return_date: z.string().min(10).optional(),
   weight: z.coerce.number().positive().optional(),
   note: z.string().trim().optional().nullable(),
+  remarks: z.string().optional().nullable(),
 });
 
 const CreatePurchaseReturn = z.object({
@@ -21,12 +23,14 @@ const CreatePurchaseReturn = z.object({
   return_date: z.string().min(10),
   weight: z.coerce.number().positive(),
   note: z.string().trim().optional(),
+  remarks: z.string().optional().nullable(),
 });
 
 const PatchPurchaseReturn = z.object({
   return_date: z.string().min(10).optional(),
   weight: z.coerce.number().positive().optional(),
   note: z.string().trim().optional().nullable(),
+  remarks: z.string().optional().nullable(),
 });
 
 function orderDispatchTotal(db: Db, orderId: number): number {
@@ -75,7 +79,7 @@ export async function registerReturnsRoutes(app: FastifyInstance, opts: { db: Db
   app.get("/returns/sales", async () => {
     const rows = db
       .prepare(
-        `SELECT id, order_id, return_date, weight, note, created_at
+        `SELECT id, order_id, return_date, weight, note, remarks, created_at
          FROM sales_returns
          ORDER BY return_date DESC, id DESC
          LIMIT 500`,
@@ -96,8 +100,8 @@ export async function registerReturnsRoutes(app: FastifyInstance, opts: { db: Db
     }
 
     db.prepare(
-      `INSERT INTO sales_returns(order_id, return_date, weight, note) VALUES (?,?,?,?)`,
-    ).run(body.order_id, body.return_date, body.weight, body.note ?? null);
+      `INSERT INTO sales_returns(order_id, return_date, weight, note, remarks) VALUES (?,?,?,?,?)`,
+    ).run(body.order_id, body.return_date, body.weight, body.note ?? null, body.remarks ?? null);
     return { data: { success: true } };
   });
 
@@ -141,7 +145,7 @@ export async function registerReturnsRoutes(app: FastifyInstance, opts: { db: Db
   app.get("/returns/purchase", async () => {
     const rows = db
       .prepare(
-        `SELECT id, purchase_entry_id, return_date, weight, note, created_at
+        `SELECT id, purchase_entry_id, return_date, weight, note, remarks, created_at
          FROM purchase_returns
          ORDER BY return_date DESC, id DESC
          LIMIT 500`,
@@ -162,8 +166,8 @@ export async function registerReturnsRoutes(app: FastifyInstance, opts: { db: Db
     }
 
     db.prepare(
-      `INSERT INTO purchase_returns(purchase_entry_id, return_date, weight, note) VALUES (?,?,?,?)`,
-    ).run(body.purchase_entry_id, body.return_date, body.weight, body.note ?? null);
+      `INSERT INTO purchase_returns(purchase_entry_id, return_date, weight, note, remarks) VALUES (?,?,?,?,?)`,
+    ).run(body.purchase_entry_id, body.return_date, body.weight, body.note ?? null, body.remarks ?? null);
     recalcReceived(db, body.purchase_entry_id);
     return { data: { success: true } };
   });

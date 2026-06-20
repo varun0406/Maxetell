@@ -17,6 +17,7 @@ import {
 import dayjs from "dayjs";
 import { createDispatchForLine, deleteDispatch, fetchDispatch, fetchOrders } from "../lib/api";
 import type { DispatchEntry, OrderRow } from "../lib/api";
+import { exportToCsv } from "../lib/export";
 
 export function DispatchPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -34,6 +35,7 @@ export function DispatchPage() {
   const [dispatchPcs, setDispatchPcs] = useState<number>(0);
   const [bundleNo, setBundleNo] = useState("");
   const [transport, setTransport] = useState("");
+  const [salesRate, setSalesRate] = useState<number>(0);
   const [tallyBillsInput, setTallyBillsInput] = useState("");
   const [retainDetails, setRetainDetails] = useState(true);
 
@@ -115,6 +117,7 @@ export function DispatchPage() {
         dispatch_pcs: dispatchPcs,
         bundle_no: bundleNo.trim() || undefined,
         transport: transport.trim() || undefined,
+        sales_rate: salesRate,
         tally_bill_nos: tallyBillsInput
           .split(/[\n,]+/g)
           .map((s) => s.trim())
@@ -135,6 +138,7 @@ export function DispatchPage() {
       setDispatchWeight(0);
       setDispatchPcs(0);
       setBundleNo("");
+      setSalesRate(0);
       if (!retainDetails) {
         setTransport("");
         setTallyBillsInput("");
@@ -148,9 +152,14 @@ export function DispatchPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={900} sx={{ mb: 2 }}>
-        Dispatch Entry
-      </Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Typography variant="h5" fontWeight={900}>
+          Dispatch Entry
+        </Typography>
+        <Button variant="outlined" onClick={() => exportToCsv("dispatch_entries", entries)}>
+          Export to Excel
+        </Button>
+      </Stack>
 
       {err ? (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -335,14 +344,24 @@ export function DispatchPage() {
                 disabled={!order || saving}
               />
               <TextField
-                label="Tally bill no(s)"
-                value={tallyBillsInput}
-                onChange={(e) => setTallyBillsInput(e.target.value)}
-                placeholder="Enter bill numbers separated by comma or new line"
+                label="Sales Rate (per kg)"
+                type="number"
+                value={salesRate || ""}
+                onChange={(e) => setSalesRate(Number(e.target.value))}
+                placeholder="0.00"
                 fullWidth
                 disabled={!order || saving}
               />
             </Stack>
+
+            <TextField
+              label="Tally bill no(s)"
+              value={tallyBillsInput}
+              onChange={(e) => setTallyBillsInput(e.target.value)}
+              placeholder="Enter bill numbers separated by comma or new line"
+              fullWidth
+              disabled={!order || saving}
+            />
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center" justifyContent="space-between">
               <FormControlLabel
@@ -405,6 +424,7 @@ export function DispatchPage() {
                   </Typography>
                   <Typography color="text.secondary" variant="body2">{e.bundle_no ?? "—"}</Typography>
                   <Typography color="text.secondary" variant="body2">{e.transport ?? "—"}</Typography>
+                  <Typography color="text.secondary" variant="body2">{e.sales_rate ? `₹${e.sales_rate}` : "—"}</Typography>
                   <Typography color="text.secondary" variant="body2" sx={{ flexGrow: 1, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                     {e.tally_bill_nos && e.tally_bill_nos.length ? e.tally_bill_nos.join(", ") : "—"}
                   </Typography>
@@ -419,6 +439,7 @@ export function DispatchPage() {
                         setDispatchPcs(e.dispatch_pcs);
                         setBundleNo(e.bundle_no || "");
                         setTransport(e.transport || "");
+                        setSalesRate(e.sales_rate || 0);
                         setTallyBillsInput(e.tally_bill_nos?.join(", ") || "");
 
                         if (e.order_line_item_id) {

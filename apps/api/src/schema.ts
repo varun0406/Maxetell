@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS orders (
   invoice_total REAL DEFAULT 0 CHECK(invoice_total >= 0),
   paid_amount REAL DEFAULT 0 CHECK(paid_amount >= 0),
 
+  remarks TEXT,
+
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -64,6 +66,7 @@ CREATE TABLE IF NOT EXISTS dispatch_entries (
   dispatch_pcs INTEGER DEFAULT 0 CHECK(dispatch_pcs >= 0),
   bundle_no TEXT,
   transport TEXT,
+  sales_rate REAL DEFAULT 0 CHECK(sales_rate >= 0),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -85,6 +88,7 @@ CREATE TABLE IF NOT EXISTS purchase_entries (
   received_weight REAL DEFAULT 0 CHECK(received_weight >= 0),
   debit_note TEXT,
   rec_note TEXT,
+  remarks TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -158,6 +162,7 @@ CREATE TABLE IF NOT EXISTS sales_returns (
   return_date TEXT NOT NULL,
   weight REAL NOT NULL CHECK(weight > 0),
   note TEXT,
+  remarks TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -167,6 +172,7 @@ CREATE TABLE IF NOT EXISTS purchase_returns (
   return_date TEXT NOT NULL,
   weight REAL NOT NULL CHECK(weight > 0),
   note TEXT,
+  remarks TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
@@ -234,7 +240,8 @@ SELECT
     WHEN o.paid_amount >= o.invoice_total THEN 'Paid'
     WHEN o.paid_amount > 0 THEN 'Partial'
     ELSE 'Pending'
-  END AS payment_status
+  END AS payment_status,
+  o.remarks
 FROM order_line_items oli
 JOIN orders o ON o.id = oli.order_id
 JOIN clients c ON c.id = o.client_id
@@ -309,6 +316,22 @@ CREATE TABLE IF NOT EXISTS dispatch_tally_bills (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
+
+  if (!columnExists(db, "orders", "remarks")) {
+    db.exec(`ALTER TABLE orders ADD COLUMN remarks TEXT;`);
+  }
+  if (!columnExists(db, "purchase_entries", "remarks")) {
+    db.exec(`ALTER TABLE purchase_entries ADD COLUMN remarks TEXT;`);
+  }
+  if (!columnExists(db, "sales_returns", "remarks")) {
+    db.exec(`ALTER TABLE sales_returns ADD COLUMN remarks TEXT;`);
+  }
+  if (!columnExists(db, "purchase_returns", "remarks")) {
+    db.exec(`ALTER TABLE purchase_returns ADD COLUMN remarks TEXT;`);
+  }
+  if (!columnExists(db, "dispatch_entries", "sales_rate")) {
+    db.exec(`ALTER TABLE dispatch_entries ADD COLUMN sales_rate REAL DEFAULT 0 CHECK(sales_rate >= 0);`);
+  }
 }
 
 export function seed(db: Db) {

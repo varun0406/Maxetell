@@ -11,9 +11,9 @@ import {
   fetchPurchaseReturns,
   fetchSalesReturns,
   fetchOrders,
-} from "../lib/api";
 import type { PurchaseLedgerRow, PurchaseReturnRow, SalesReturnRow } from "../lib/api";
 import type { OrderRow } from "../lib/api";
+import { exportToCsv } from "../lib/export";
 
 function money(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -29,14 +29,14 @@ export function ReturnsPage() {
   const [purchaseReturns, setPurchaseReturns] = useState<PurchaseReturnRow[]>([]);
 
   const [salesOrderId, setSalesOrderId] = useState<number>(0);
-  const [salesDate, setSalesDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [salesWeight, setSalesWeight] = useState<number>(0);
   const [salesNote, setSalesNote] = useState("");
+  const [salesRemarks, setSalesRemarks] = useState("");
 
   const [poId, setPoId] = useState<number>(0);
-  const [poDate, setPoDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [poWeight, setPoWeight] = useState<number>(0);
   const [poNote, setPoNote] = useState("");
+  const [poRemarks, setPoRemarks] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -121,6 +121,7 @@ export function ReturnsPage() {
                 onChange={(e) => setSalesWeight(Number(e.target.value))}
               />
               <TextField label="Note" size="small" value={salesNote} onChange={(e) => setSalesNote(e.target.value)} />
+              <TextField label="Remarks" size="small" value={salesRemarks} onChange={(e) => setSalesRemarks(e.target.value)} />
               <Button
                 variant="contained"
                 disabled={saving || !salesOrderId || salesWeight <= 0}
@@ -133,9 +134,11 @@ export function ReturnsPage() {
                       return_date: salesDate,
                       weight: salesWeight,
                       note: salesNote.trim() || undefined,
+                      remarks: salesRemarks.trim() || undefined,
                     });
                     setSalesWeight(0);
                     setSalesNote("");
+                    setSalesRemarks("");
                     await refresh();
                   } catch (e: unknown) {
                     setErr(e instanceof Error ? e.message : "Failed to save sales return");
@@ -189,6 +192,7 @@ export function ReturnsPage() {
                 onChange={(e) => setPoWeight(Number(e.target.value))}
               />
               <TextField label="Note" size="small" value={poNote} onChange={(e) => setPoNote(e.target.value)} />
+              <TextField label="Remarks" size="small" value={poRemarks} onChange={(e) => setPoRemarks(e.target.value)} />
               <Button
                 variant="contained"
                 disabled={saving || !poId || poWeight <= 0}
@@ -201,9 +205,11 @@ export function ReturnsPage() {
                       return_date: poDate,
                       weight: poWeight,
                       note: poNote.trim() || undefined,
+                      remarks: poRemarks.trim() || undefined,
                     });
                     setPoWeight(0);
                     setPoNote("");
+                    setPoRemarks("");
                     await refresh();
                   } catch (e: unknown) {
                     setErr(e instanceof Error ? e.message : "Failed to save purchase return");
@@ -222,9 +228,14 @@ export function ReturnsPage() {
       <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
         <Card sx={{ flex: 1 }}>
           <CardContent>
-            <Typography fontWeight={900} sx={{ mb: 1 }}>
-              Sales returns history
-            </Typography>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+              <Typography fontWeight={900}>
+                Sales returns history
+              </Typography>
+              <Button variant="outlined" size="small" onClick={() => exportToCsv("sales_returns", salesReturns)}>
+                Export
+              </Button>
+            </Stack>
             {salesReturns.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 No sales returns yet.
@@ -240,7 +251,12 @@ export function ReturnsPage() {
                       <b>{r.return_date}</b> — {money(r.weight)} kg — order #{r.order_id}
                       {r.note ? (
                         <Typography variant="caption" display="block" color="text.secondary">
-                          {r.note}
+                          Note: {r.note}
+                        </Typography>
+                      ) : null}
+                      {r.remarks ? (
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          Remarks: {r.remarks}
                         </Typography>
                       ) : null}
                     </Box>
@@ -268,9 +284,14 @@ export function ReturnsPage() {
 
         <Card sx={{ flex: 1 }}>
           <CardContent>
-            <Typography fontWeight={900} sx={{ mb: 1 }}>
-              Purchase returns history
-            </Typography>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+              <Typography fontWeight={900}>
+                Purchase returns history
+              </Typography>
+              <Button variant="outlined" size="small" onClick={() => exportToCsv("purchase_returns", purchaseReturns)}>
+                Export
+              </Button>
+            </Stack>
             {purchaseReturns.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 No purchase returns yet.
@@ -286,7 +307,12 @@ export function ReturnsPage() {
                       <b>{r.return_date}</b> — {money(r.weight)} kg — PO #{r.purchase_entry_id}
                       {r.note ? (
                         <Typography variant="caption" display="block" color="text.secondary">
-                          {r.note}
+                          Note: {r.note}
+                        </Typography>
+                      ) : null}
+                      {r.remarks ? (
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          Remarks: {r.remarks}
                         </Typography>
                       ) : null}
                     </Box>

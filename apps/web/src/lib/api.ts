@@ -98,6 +98,7 @@ export type OrderRow = {
   paid_amount: number;
   baki_amount: number;
   payment_status: "NoInvoice" | "Paid" | "Partial" | "Pending";
+  remarks: string | null;
 };
 
 export async function fetchOrders(params?: {
@@ -124,6 +125,7 @@ export async function createOrder(body: {
   wo_no: string;
   order_date: string;
   client_name: string;
+  remarks?: string;
   lines: CreateOrderLine[];
 }) {
   const res = await api.post<{ data: OrderRow[] }>("/orders", body);
@@ -140,7 +142,7 @@ export async function patchOrder(
 
 export async function patchOrderMeta(
   orderId: number,
-  body: Partial<Pick<OrderRow, "wo_no" | "order_date" | "client_name">>,
+  body: Partial<Pick<OrderRow, "wo_no" | "order_date" | "client_name" | "remarks">>,
 ) {
   const res = await api.patch<{ data: OrderRow[] }>(`/orders/${orderId}/meta`, body);
   return res.data.data;
@@ -212,6 +214,29 @@ export async function fetchDashboardSummary() {
   return res.data.data;
 }
 
+export type DashboardAnalytics = {
+  avg_purchase_price: number;
+  monthly_summary: Array<{
+    month: string;
+    sales_weight: number;
+    sales_amount: number;
+    purchase_weight: number;
+    purchase_amount: number;
+    sales_return_weight: number;
+    purchase_return_weight: number;
+  }>;
+  quarterly_sales: Array<{
+    quarter: string;
+    sales_weight: number;
+    sales_amount: number;
+  }>;
+};
+
+export async function fetchDashboardAnalytics() {
+  const res = await api.get<{ data: DashboardAnalytics }>("/dashboard/analytics");
+  return res.data.data;
+}
+
 export async function patchOpeningStock(opening_stock_kgs: number) {
   const res = await api.patch<{ data: { opening_stock_kgs: number } }>("/inventory/opening-stock", {
     opening_stock_kgs,
@@ -237,6 +262,7 @@ export type DispatchEntry = {
   dispatch_pcs: number;
   bundle_no: string | null;
   transport: string | null;
+  sales_rate: number;
   tally_bill_nos?: string[];
   created_at: string;
 };
@@ -249,6 +275,7 @@ export async function createDispatch(
     dispatch_pcs?: number;
     bundle_no?: string;
     transport?: string;
+    sales_rate?: number;
     tally_bill_nos?: string[];
   },
 ) {
@@ -275,6 +302,7 @@ export async function createDispatchForLine(
     dispatch_pcs?: number;
     bundle_no?: string;
     transport?: string;
+    sales_rate?: number;
     tally_bill_nos?: string[];
   },
 ) {
@@ -289,7 +317,7 @@ export async function addDispatchTallyBill(dispatchId: number, bill_no: string) 
 
 export async function patchDispatch(
   dispatchId: number,
-  body: Partial<Pick<DispatchEntry, "dispatch_date" | "dispatch_weight" | "dispatch_pcs" | "bundle_no" | "transport">>,
+  body: Partial<Pick<DispatchEntry, "dispatch_date" | "dispatch_weight" | "dispatch_pcs" | "bundle_no" | "transport" | "sales_rate">>,
 ) {
   const res = await api.patch<{ data: OrderRow[] }>(`/dispatch/${dispatchId}`, body);
   return res.data.data;
@@ -316,6 +344,7 @@ export type PurchaseLedgerRow = {
   amount_received: number;
   debit_note: string | null;
   rec_note: string | null;
+  remarks: string | null;
 };
 
 export async function createPurchase(body: {
@@ -328,6 +357,7 @@ export async function createPurchase(body: {
   size: string;
   item: string;
   grade: string;
+  remarks?: string;
 }) {
   const res = await api.post<{ data: PurchaseLedgerRow }>("/purchase", body);
   return res.data.data;
@@ -344,6 +374,7 @@ export async function createPurchaseBatch(body: {
     size: string;
     item: string;
     grade: string;
+    remarks?: string;
   }>;
 }) {
   const res = await api.post<{ data: PurchaseLedgerRow[] }>("/purchase/batch", body);
@@ -379,7 +410,7 @@ export async function createPurchaseReceipt(
 export async function patchPurchase(
   purchaseId: number,
   body: Partial<
-    Pick<PurchaseLedgerRow, "supplier_name" | "po_no" | "purchase_date" | "weight" | "rate" | "debit_note" | "rec_note" | "size" | "item" | "grade">
+    Pick<PurchaseLedgerRow, "supplier_name" | "po_no" | "purchase_date" | "weight" | "rate" | "debit_note" | "rec_note" | "size" | "item" | "grade" | "remarks">
   >,
 ) {
   const res = await api.patch<{ data: PurchaseLedgerRow }>(`/purchase/${purchaseId}`, body);
@@ -433,6 +464,7 @@ export type SalesReturnRow = {
   return_date: string;
   weight: number;
   note: string | null;
+  remarks: string | null;
   created_at: string;
 };
 
@@ -442,6 +474,7 @@ export type PurchaseReturnRow = {
   return_date: string;
   weight: number;
   note: string | null;
+  remarks: string | null;
   created_at: string;
 };
 
@@ -450,7 +483,7 @@ export async function fetchSalesReturns() {
   return res.data.data;
 }
 
-export async function createSalesReturn(body: { order_id: number; return_date: string; weight: number; note?: string }) {
+export async function createSalesReturn(body: { order_id: number; return_date: string; weight: number; note?: string; remarks?: string }) {
   const res = await api.post<{ data: { success: true } }>("/returns/sales", body);
   return res.data.data;
 }
@@ -465,7 +498,7 @@ export async function fetchPurchaseReturns() {
   return res.data.data;
 }
 
-export async function createPurchaseReturn(body: { purchase_entry_id: number; return_date: string; weight: number; note?: string }) {
+export async function createPurchaseReturn(body: { purchase_entry_id: number; return_date: string; weight: number; note?: string; remarks?: string }) {
   const res = await api.post<{ data: { success: true } }>("/returns/purchase", body);
   return res.data.data;
 }

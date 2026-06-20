@@ -21,6 +21,7 @@ const PatchOrderMetaBody = z.object({
   wo_no: z.string().trim().min(1).optional(),
   order_date: z.string().min(10).optional(),
   client_name: z.string().trim().min(1).optional(),
+  remarks: z.string().optional().nullable(),
 });
 
 const PatchLineBody = z.object({
@@ -50,6 +51,7 @@ const CreateOrderBody = z.object({
   wo_no: z.string().trim().min(1),
   order_date: z.string().min(10),
   client_name: z.string().trim().min(1),
+  remarks: z.string().optional().nullable(),
   lines: z.array(OrderLine).min(1),
 });
 
@@ -163,8 +165,8 @@ export async function registerOrdersRoutes(app: FastifyInstance, opts: { db: Db 
     try {
       const orderInfo = db
         .prepare(
-          `INSERT INTO orders(wo_no, order_date, client_id, product_id, length_nos, order_kgs, avg_cost, bill_rate)
-           VALUES (?,?,?,?,?,?,0,0)`,
+          `INSERT INTO orders(wo_no, order_date, client_id, product_id, length_nos, order_kgs, avg_cost, bill_rate, remarks)
+           VALUES (?,?,?,?,?,?,0,0,?)`,
         )
         .run(
           body.wo_no,
@@ -173,6 +175,7 @@ export async function registerOrdersRoutes(app: FastifyInstance, opts: { db: Db 
           first.productId,
           first.length_nos ?? null,
           totalKgs,
+          body.remarks ?? null,
         );
 
       const orderId = Number(orderInfo.lastInsertRowid);
@@ -228,6 +231,10 @@ export async function registerOrdersRoutes(app: FastifyInstance, opts: { db: Db 
       const clientId = resolveClientId(db, body.client_name);
       fields.push(`client_id = @client_id`);
       binds.client_id = clientId;
+    }
+    if (body.remarks !== undefined) {
+      fields.push(`remarks = @remarks`);
+      binds.remarks = body.remarks;
     }
 
     try {

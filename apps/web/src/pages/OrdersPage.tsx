@@ -33,8 +33,8 @@ import {
   patchOrderLine,
   deleteOrder,
 } from "../lib/api";
-import type { MasterProduct, OrderRow } from "../lib/api";
 import type { DispatchEntry, PaymentEntry } from "../lib/api";
+import { exportToCsv } from "../lib/export";
 
 function money(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -293,6 +293,9 @@ export function OrdersPage() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
+          <Button variant="outlined" onClick={() => exportToCsv("orders", rows)}>
+            Export to Excel
+          </Button>
           <Button variant="contained" component={RouterLink} to="/orders/new">
             Add Order
           </Button>
@@ -381,8 +384,8 @@ export function OrdersPage() {
             sx={{
               display: "grid",
               gridTemplateColumns:
-                "120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px",
-              minWidth: 1980,
+                "120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
+              minWidth: 2140,
               gap: 0,
               borderBottom: "1px solid rgba(15, 23, 42, 0.08)",
               position: "sticky",
@@ -409,6 +412,7 @@ export function OrdersPage() {
               "AVE PRO",
               "Paid",
               "Baki",
+              "Remarks",
             ].map((h) => (
               <Box key={h} sx={{ px: 1.5, py: 1, fontWeight: 800, fontSize: 12 }}>
                 {h}
@@ -426,8 +430,8 @@ export function OrdersPage() {
                 sx={{
                   display: "grid",
                   gridTemplateColumns:
-                    "120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px",
-                  minWidth: 1980,
+                    "120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
+                  minWidth: 2140,
                   borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
                   cursor: "pointer",
                   "&:hover": { background: "rgba(37, 99, 235, 0.04)" },
@@ -460,6 +464,7 @@ export function OrdersPage() {
                 >
                   {money(r.baki_amount)}
                 </Cell>
+                <Cell>{r.remarks || "—"}</Cell>
               </Box>
             );
           })}
@@ -468,8 +473,8 @@ export function OrdersPage() {
             sx={{
               display: "grid",
               gridTemplateColumns:
-                "120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px",
-              minWidth: 1980,
+                "120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
+              minWidth: 2140,
               borderTop: "2px solid rgba(15, 23, 42, 0.12)",
               background: "rgba(15, 23, 42, 0.02)",
               position: "sticky",
@@ -505,6 +510,7 @@ export function OrdersPage() {
             <Cell strong highlight={header.bakiTotal > 0.0001 ? "warning" : undefined}>
               {money(header.bakiTotal)}
             </Cell>
+            <Cell>{" "}</Cell>
           </Box>
         </Box>
       )}
@@ -569,6 +575,7 @@ export function OrdersPage() {
                           wo_no: selected.wo_no,
                           order_date: selected.order_date,
                           client_name: selected.client_name,
+                          remarks: selected.remarks || undefined,
                         });
                         setEditWo(false);
                       }}
@@ -609,6 +616,13 @@ export function OrdersPage() {
                 size="small"
                 value={selected.client_name}
                 onChange={(e) => setSelected({ ...selected, client_name: e.target.value })}
+                disabled={saving || !editWo}
+              />
+              <TextField
+                label="Remarks"
+                size="small"
+                value={selected.remarks || ""}
+                onChange={(e) => setSelected({ ...selected, remarks: e.target.value })}
                 disabled={saving || !editWo}
               />
 

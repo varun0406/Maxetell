@@ -19,6 +19,7 @@ const CreatePurchaseBody = z.object({
   size: z.string().trim().min(1),
   item: z.string().trim().min(1),
   grade: z.string().trim().min(1),
+  remarks: z.string().optional().nullable(),
 });
 
 const CreatePurchaseBatchBody = z.object({
@@ -34,6 +35,7 @@ const CreatePurchaseBatchBody = z.object({
         size: z.string().trim().min(1),
         item: z.string().trim().min(1),
         grade: z.string().trim().min(1),
+        remarks: z.string().optional().nullable(),
       }),
     )
     .min(1),
@@ -64,6 +66,7 @@ const PatchPurchaseBody = z.object({
   item: z.string().trim().min(1).optional(),
   grade: z.string().trim().min(1).optional(),
   rec_note: z.string().trim().optional().nullable(),
+  remarks: z.string().optional().nullable(),
 });
 
 const PatchReceiptBody = z.object({
@@ -87,6 +90,7 @@ function ledgerRow(db: Db, id: number) {
          (pe.received_weight * pe.rate) AS amount_received,
          pe.debit_note,
          pe.rec_note,
+         pe.remarks,
          s.name AS supplier_name,
          pr.size AS size,
          pr.item AS item,
@@ -136,6 +140,7 @@ SELECT
   (pe.received_weight * pe.rate) AS amount_received,
   pe.debit_note,
   pe.rec_note,
+  pe.remarks,
   s.name AS supplier_name,
   pr.size AS size,
   pr.item AS item,
@@ -186,10 +191,10 @@ LIMIT 500
 
     const info = db
       .prepare(
-        `INSERT INTO purchase_entries(supplier_id, product_id, po_no, purchase_date, weight, rate, received_weight, debit_note)
-         VALUES (?,?,?,?,?,?,0,?)`,
+        `INSERT INTO purchase_entries(supplier_id, product_id, po_no, purchase_date, weight, rate, received_weight, debit_note, remarks)
+         VALUES (?,?,?,?,?,?,0,?,?)`,
       )
-      .run(supplierId, productId, body.po_no ?? null, body.purchase_date, body.weight, body.rate, body.debit_note ?? null);
+      .run(supplierId, productId, body.po_no ?? null, body.purchase_date, body.weight, body.rate, body.debit_note ?? null, body.remarks ?? null);
 
     const id = Number(info.lastInsertRowid);
     return { data: ledgerRow(db, id) };
@@ -203,8 +208,8 @@ LIMIT 500
       const created = db.transaction(() => {
         const supplierId = resolveSupplierId(db, body.supplier_name);
         const ins = db.prepare(
-          `INSERT INTO purchase_entries(supplier_id, product_id, po_no, purchase_date, weight, rate, received_weight, debit_note)
-           VALUES (?,?,?,?,?,?,0,?)`,
+          `INSERT INTO purchase_entries(supplier_id, product_id, po_no, purchase_date, weight, rate, received_weight, debit_note, remarks)
+           VALUES (?,?,?,?,?,?,0,?,?)`,
         );
         const ids: number[] = [];
         for (const l of body.lines) {
@@ -217,6 +222,7 @@ LIMIT 500
             l.weight,
             l.rate,
             l.debit_note ?? null,
+            l.remarks ?? null,
           );
           ids.push(Number(info.lastInsertRowid));
         }
@@ -303,7 +309,7 @@ LIMIT 500
       fields.push(`product_id = @product_id`);
       binds.product_id = nextProductId;
     }
-    for (const key of ["po_no", "purchase_date", "weight", "rate", "debit_note", "rec_note"] as const) {
+    for (const key of ["po_no", "purchase_date", "weight", "rate", "debit_note", "rec_note", "remarks"] as const) {
       if ((body as any)[key] !== undefined) {
         fields.push(`${key} = @${key}`);
         binds[key] = (body as any)[key] ?? null;

@@ -31,8 +31,8 @@ import {
   fetchPurchaseReceipts,
   patchPurchase,
   patchPurchaseReceipt,
-} from "../lib/api";
 import type { MasterProduct, PurchaseLedgerRow, PurchaseReceiptRow } from "../lib/api";
+import { exportToCsv } from "../lib/export";
 
 function money(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -67,6 +67,7 @@ export function PurchasePage() {
     weight: number;
     rate: number;
     debit_note: string;
+    remarks: string;
   };
 
   const emptyPoLine = (): PoLineDraft => ({
@@ -76,6 +77,7 @@ export function PurchasePage() {
     weight: 0,
     rate: 0,
     debit_note: "",
+    remarks: "",
   });
 
   /** A single PO can contain many raw-material lines. */
@@ -136,6 +138,7 @@ export function PurchasePage() {
         weight: Number(l.weight) || 0,
         rate: Number(l.rate) || 0,
         debit_note: l.debit_note.trim(),
+        remarks: l.remarks.trim(),
       }))
       .filter((l) => l.item && l.weight > 0);
 
@@ -157,6 +160,7 @@ export function PurchasePage() {
           size: l.size,
           item: l.item,
           grade: l.grade,
+          remarks: l.remarks || undefined,
         })),
       });
       setRows((prev) => [...created, ...prev]);
@@ -209,6 +213,7 @@ export function PurchasePage() {
         | "size"
         | "item"
         | "grade"
+        | "remarks"
       >
     >,
   ) {
@@ -264,9 +269,14 @@ export function PurchasePage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={900} sx={{ mb: 1 }}>
-        Raw material — Purchase orders & receipts
-      </Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+        <Typography variant="h5" fontWeight={900}>
+          Raw material — Purchase orders & receipts
+        </Typography>
+        <Button variant="outlined" onClick={() => exportToCsv("purchases", rows)}>
+          Export to Excel
+        </Button>
+      </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Create a PO first, then record each goods-in (received weight) against that PO. Balance = ordered − received (negative
         balance means you are within the allowed +300 kg over-receipt vs ordered). AVE on sales orders is the weighted purchase
@@ -415,21 +425,38 @@ export function PurchasePage() {
                         <TextField label="AMOUNT (wt × rate)" value={money(amountPreview)} disabled fullWidth />
                       </Stack>
 
-                      <TextField
-                        label="DEBIT NOTE (optional)"
-                        value={line.debit_note}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setPoLines((prev) => {
-                            const next = [...prev];
-                            next[idx] = { ...next[idx], debit_note: v };
-                            return next;
-                          });
-                        }}
-                        fullWidth
-                        multiline
-                        minRows={2}
-                      />
+                      <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                        <TextField
+                          label="DEBIT NOTE (optional)"
+                          value={line.debit_note}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setPoLines((prev) => {
+                              const next = [...prev];
+                              next[idx] = { ...next[idx], debit_note: v };
+                              return next;
+                            });
+                          }}
+                          fullWidth
+                          multiline
+                          minRows={2}
+                        />
+                        <TextField
+                          label="Remarks (optional)"
+                          value={line.remarks}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setPoLines((prev) => {
+                              const next = [...prev];
+                              next[idx] = { ...next[idx], remarks: v };
+                              return next;
+                            });
+                          }}
+                          fullWidth
+                          multiline
+                          minRows={2}
+                        />
+                      </Stack>
                     </Stack>
                   </Box>
                 );
@@ -530,8 +557,8 @@ export function PurchasePage() {
                 sx={{
                   display: "grid",
                   gridTemplateColumns:
-                    "100px 110px minmax(100px, 1fr) minmax(160px, 220px) 90px 90px 90px 80px 100px 110px 110px 120px 140px",
-                  minWidth: 1480,
+                    "100px 110px minmax(100px, 1fr) minmax(160px, 220px) 90px 90px 90px 80px 100px 110px 110px 120px 140px 160px",
+                  minWidth: 1640,
                   gap: 0.5,
                   alignItems: "center",
                   borderBottom: "1px solid rgba(15,23,42,0.1)",
@@ -553,6 +580,7 @@ export function PurchasePage() {
                 <span>AMT ord</span>
                 <span>AMT recvd</span>
                 <span>REC NOTE</span>
+                <span>REMARKS</span>
                 <span />
               </Box>
               {shownRows.map((r) => (
@@ -562,8 +590,8 @@ export function PurchasePage() {
                   sx={{
                     display: "grid",
                     gridTemplateColumns:
-                      "100px 110px minmax(100px, 1fr) minmax(160px, 220px) 90px 90px 90px 80px 100px 110px 110px 120px 140px",
-                    minWidth: 1480,
+                      "100px 110px minmax(100px, 1fr) minmax(160px, 220px) 90px 90px 90px 80px 100px 110px 110px 120px 140px 160px",
+                    minWidth: 1640,
                     gap: 0.5,
                     alignItems: "center",
                     border: "1px solid rgba(15,23,42,0.08)",
@@ -592,6 +620,9 @@ export function PurchasePage() {
                   <span style={{ color: r.amount_received > 0 ? "#16a34a" : undefined }}>{money(r.amount_received)}</span>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {r.rec_note ?? "—"}
+                  </span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {r.remarks ?? "—"}
                   </span>
                   <Button size="small" variant="outlined" onClick={(e) => (e.stopPropagation(), setDrawerPo(r))}>
                     Receipts
@@ -723,15 +754,26 @@ export function PurchasePage() {
                   fullWidth
                 />
               </Stack>
-              <TextField
-                label="DEBIT NOTE"
-                size="small"
-                value={drawerPo.debit_note ?? ""}
-                onChange={(e) => setDrawerPo({ ...drawerPo, debit_note: e.target.value || null })}
-                onBlur={() => saveDrawerPoPatch({ debit_note: drawerPo.debit_note })}
-                disabled={saving}
-                fullWidth
-              />
+              <Stack direction="row" spacing={1.5}>
+                <TextField
+                  label="DEBIT NOTE"
+                  size="small"
+                  value={drawerPo.debit_note ?? ""}
+                  onChange={(e) => setDrawerPo({ ...drawerPo, debit_note: e.target.value || null })}
+                  onBlur={() => saveDrawerPoPatch({ debit_note: drawerPo.debit_note })}
+                  disabled={saving}
+                  fullWidth
+                />
+                <TextField
+                  label="Remarks"
+                  size="small"
+                  value={drawerPo.remarks ?? ""}
+                  onChange={(e) => setDrawerPo({ ...drawerPo, remarks: e.target.value || null })}
+                  onBlur={() => saveDrawerPoPatch({ remarks: drawerPo.remarks })}
+                  disabled={saving}
+                  fullWidth
+                />
+              </Stack>
             </Stack>
 
             <TextField
