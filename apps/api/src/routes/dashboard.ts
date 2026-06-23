@@ -92,8 +92,13 @@ FROM order_line_items oli
   });
 
   app.get("/dashboard/analytics", async () => {
-    // Average purchase price overall
-    const avgPurchasePriceRow = db.prepare(`SELECT SUM(weight * rate) / SUM(weight) as avg FROM purchase_entries WHERE weight > 0`).get() as { avg: number | null };
+    // Average purchase price overall based on received material
+    const avgPurchasePriceRow = db.prepare(`
+      SELECT SUM(pr.weight_received * pe.rate) / SUM(pr.weight_received) as avg 
+      FROM purchase_receipts pr
+      JOIN purchase_entries pe ON pr.purchase_entry_id = pe.id
+      WHERE pr.weight_received > 0
+    `).get() as { avg: number | null };
     const avgPurchasePrice = avgPurchasePriceRow?.avg || 0;
 
     // Monthly summary
