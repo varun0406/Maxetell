@@ -237,6 +237,36 @@ export async function fetchDashboardAnalytics() {
   return res.data.data;
 }
 
+export type ProductStockRow = {
+  product_id: number;
+  size: string;
+  item: string;
+  grade: string;
+  receipts: number;
+  purchase_returns: number;
+  dispatches: number;
+  sales_returns: number;
+  current_stock: number;
+};
+
+export async function fetchProductStockBreakdown() {
+  const res = await api.get<{ data: ProductStockRow[] }>("/dashboard/product_stock");
+  return res.data.data;
+}
+
+export type ProductLedgerRow = {
+  type: string;
+  date: string;
+  weight: number;
+  ref: string | null;
+  balance: number;
+};
+
+export async function fetchProductLedger(productId: number) {
+  const res = await api.get<{ data: ProductLedgerRow[] }>(`/dashboard/product_ledger/${productId}`);
+  return res.data.data;
+}
+
 export async function patchOpeningStock(opening_stock_kgs: number) {
   const res = await api.patch<{ data: { opening_stock_kgs: number } }>("/inventory/opening-stock", {
     opening_stock_kgs,

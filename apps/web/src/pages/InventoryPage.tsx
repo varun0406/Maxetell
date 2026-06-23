@@ -14,7 +14,15 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { fetchDashboardSummary, patchMinimumStock, patchOpeningStock } from "../lib/api";
+import { 
+  fetchDashboardSummary, 
+  patchMinimumStock, 
+  patchOpeningStock,
+  fetchProductStockBreakdown,
+  fetchProductLedger,
+  type ProductStockRow,
+  type ProductLedgerRow
+} from "../lib/api";
 
 export function InventoryPage() {
   const [loading, setLoading] = useState(true);
@@ -27,13 +35,20 @@ export function InventoryPage() {
   const [minimumInput, setMinimumInput] = useState<number>(0);
   const [savingMinimum, setSavingMinimum] = useState(false);
 
+  const [productStock, setProductStock] = useState<ProductStockRow[]>([]);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [ledgerData, setLedgerData] = useState<ProductLedgerRow[]>([]);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [selectedProductStr, setSelectedProductStr] = useState("");
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchDashboardSummary()
-      .then((s) => {
+    Promise.all([fetchDashboardSummary(), fetchProductStockBreakdown()])
+      .then(([s, pStock]) => {
         if (!alive) return;
         setSummary(s);
+        setProductStock(pStock);
         setOpeningInput(s.opening_stock_kgs ?? 0);
         setMinimumInput(s.minimum_stock_kgs ?? 0);
         setErr(null);
@@ -76,6 +91,21 @@ export function InventoryPage() {
       setErr(e instanceof Error ? e.message : "Failed to save minimum stock");
     } finally {
       setSavingMinimum(false);
+    }
+  }
+
+  async function openLedger(p: ProductStockRow) {
+    setSelectedProductStr(`${p.item} - ${p.size} (${p.grade})`);
+    setLedgerOpen(true);
+    setLedgerLoading(true);
+    setLedgerData([]);
+    try {
+      const data = await fetchProductLedger(p.product_id);
+      setLedgerData(data);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Failed to load ledger");
+    } finally {
+      setLedgerLoading(false);
     }
   }
 
@@ -142,11 +172,49 @@ export function InventoryPage() {
                   {Math.round(summary.breakdown.incoming_rm_return_kgs)} kg
                 </Typography>
               ) : null}
-              {negative ? (
-                <Alert severity="warning" sx={{ mt: 1 }}>
-                  Stock is negative. Next step: show product-wise breakdown + drill-down to transactions causing it.
-                </Alert>
-              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <Typography fontWeight={900} sx={{ mb: 2 }}>
+                Product Breakdown
+              </Typography>
+              {productStock.length === 0 ? (
+                <Typography color="text.secondary">No stock data available yet.</Typography>
+              ) : (
+                <Box sx={{ overflowX: "auto" }}>
+                  <Box sx={{ minWidth: 800 }}>
+                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr 150px", p: 2, borderBottom: "1px solid rgba(0,0,0,0.1)", fontWeight: 800 }}>
+                      <Box>Product</Box>
+                      <Box>Receipts</Box>
+                      <Box>Purchase Returns</Box>
+                      <Box>Dispatches</Box>
+                      <Box>Sales Returns</Box>
+                      <Box>Current Stock</Box>
+                      <Box>Action</Box>
+                    </Box>
+                    {productStock.map((p) => {
+                      const isNegative = p.current_stock < -0.0001;
+                      return (
+                        <Box key={p.product_id} sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr 150px", p: 2, borderBottom: "1px solid rgba(0,0,0,0.05)", alignItems: "center" }}>
+                          <Box fontWeight={700}>{p.item} <Typography variant="body2" component="span" color="text.secondary">({p.size} {p.grade})</Typography></Box>
+                          <Box>{Math.round(p.receipts)} kg</Box>
+                          <Box>{Math.round(p.purchase_returns)} kg</Box>
+                          <Box>{Math.round(p.dispatches)} kg</Box>
+                          <Box>{Math.round(p.sales_returns)} kg</Box>
+                          <Box fontWeight={isNegative ? 900 : 400} color={isNegative ? "error.main" : "inherit"}>
+                            {Math.round(p.current_stock)} kg
+                          </Box>
+                          <Box>
+                            <Button size="small" variant="outlined" onClick={() => openLedger(p)}>Ledger</Button>
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Stack>
@@ -200,6 +268,47 @@ export function InventoryPage() {
           <Button variant="contained" onClick={saveMinimum} disabled={savingMinimum}>
             {savingMinimum ? "Saving…" : "Save"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={ledgerOpen} onClose={() => setLedgerOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Ledger: {selectedProductStr}</DialogTitle>
+        <DialogContent dividers>
+          {ledgerLoading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : ledgerData.length === 0 ? (
+            <Typography color="text.secondary" textAlign="center" py={4}>No transactions found.</Typography>
+          ) : (
+            <Box sx={{ overflowX: "auto" }}>
+              <Box sx={{ minWidth: 600 }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: "150px 150px 150px 1fr 1fr", p: 1, borderBottom: "1px solid rgba(0,0,0,0.1)", fontWeight: 800 }}>
+                  <Box>Date</Box>
+                  <Box>Type</Box>
+                  <Box>Ref</Box>
+                  <Box textAlign="right">Weight (kg)</Box>
+                  <Box textAlign="right">Balance (kg)</Box>
+                </Box>
+                {ledgerData.map((row, i) => (
+                  <Box key={i} sx={{ display: "grid", gridTemplateColumns: "150px 150px 150px 1fr 1fr", p: 1, borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
+                    <Box>{row.date.split("T")[0]}</Box>
+                    <Box>{row.type}</Box>
+                    <Box>{row.ref || "-"}</Box>
+                    <Box textAlign="right" color={row.weight < 0 ? "error.main" : "success.main"}>
+                      {row.weight > 0 ? "+" : ""}{Math.round(row.weight)}
+                    </Box>
+                    <Box textAlign="right" fontWeight={700} color={row.balance < 0 ? "error.main" : "inherit"}>
+                      {Math.round(row.balance)}
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLedgerOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
