@@ -148,4 +148,88 @@ FROM order_line_items oli
       }
     };
   });
+
+  app.get("/dashboard/product_stock", async () => {
+    const products = db.prepare(`
+      SELECT 
+        p.id as product_id, p.size, p.item, p.grade,
+        COALESCE(pr.receipts, 0) as receipts,
+        COALESCE(pret.returns, 0) as purchase_returns,
+        COALESCE(de.dispatches, 0) as dispatches,
+        COALESCE(sret.returns, 0) as sales_returns,
+        (COALESCE(pr.receipts, 0) - COALESCE(pret.returns, 0) - COALESCE(de.dispatches, 0) + COALESCE(sret.returns, 0)) as current_stock
+      FROM products p
+      LEFT JOIN (
+        SELECT pe.product_id, SUM(pr.weight_received) as receipts
+        FROM purchase_receipts pr
+        JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
+        GROUP BY pe.product_id
+      ) pr ON pr.product_id = p.id
+      LEFT JOIN (
+        SELECT pe.product_id, SUM(pret.weight) as returns
+        FROM purchase_returns pret
+        JOIN purchase_entries pe ON pe.id = pret.purchase_entry_id
+        GROUP BY pe.product_id
+      ) pret ON pret.product_id = p.id
+      LEFT JOIN (
+        SELECT o.product_id, SUM(de.dispatch_weight) as dispatches
+        FROM dispatch_entries de
+        JOIN orders o ON o.id = de.order_id
+        GROUP BY o.product_id
+      ) de ON de.product_id = p.id
+      LEFT JOIN (
+        SELECT o.product_id, SUM(sret.weight) as returns
+        FROM sales_returns sret
+        JOIN orders o ON o.id = sret.order_id
+        GROUP BY o.product_id
+      ) sret ON sret.product_id = p.id
+      WHERE (COALESCE(pr.receipts, 0) + COALESCE(pret.returns, 0) + COALESCE(de.dispatches, 0) + COALESCE(sret.returns, 0)) > 0
+      ORDER BY p.item, p.size, p.grade
+    `).all();
+
+    return { data: products };
+  });
+
+  app.get<{ Params: { productId: string } }>("/dashboard/product_ledger/:productId", async (req) => {
+    const productId = Number(req.params.productId);
+    
+    // Ledger: union of all transactions ordered by date
+    const ledger = db.prepare(`
+      SELECT 'Receipt' as type, pr.receipt_date as date, pr.weight_received as weight, pe.po_no as ref
+      FROM purchase_receipts pr
+      JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
+      WHERE pe.product_id = ?
+      
+      UNION ALL
+      
+      SELECT 'Purchase Return' as type, pret.return_date as date, -pret.weight as weight, pe.po_no as ref
+      FROM purchase_returns pret
+      JOIN purchase_entries pe ON pe.id = pret.purchase_entry_id
+      WHERE pe.product_id = ?
+      
+      UNION ALL
+      
+      SELECT 'Dispatch' as type, de.dispatch_date as date, -de.dispatch_weight as weight, o.wo_no as ref
+      FROM dispatch_entries de
+      JOIN orders o ON o.id = de.order_id
+      WHERE o.product_id = ?
+      
+      UNION ALL
+      
+      SELECT 'Sales Return' as type, sret.return_date as date, sret.weight as weight, o.wo_no as ref
+      FROM sales_returns sret
+      JOIN orders o ON o.id = sret.order_id
+      WHERE o.product_id = ?
+      
+      ORDER BY date ASC
+    `).all(productId, productId, productId, productId) as { type: string, date: string, weight: number, ref: string | null }[];
+
+    let balance = 0;
+    const ledgerWithBalance = ledger.map(entry => {
+      balance += entry.weight;
+      return { ...entry, balance };
+    });
+
+    return { data: ledgerWithBalance };
+  });
 }
