@@ -175,6 +175,24 @@ CREATE TABLE IF NOT EXISTS purchase_returns (
   remarks TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS job_work_inward (
+  id INTEGER PRIMARY KEY,
+  challan_date TEXT NOT NULL,
+  description TEXT NOT NULL,
+  qty REAL NOT NULL CHECK(qty >= 0),
+  short_qty REAL DEFAULT 0 CHECK(short_qty >= 0),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS job_work_outward (
+  id INTEGER PRIMARY KEY,
+  inward_id INTEGER NOT NULL REFERENCES job_work_inward(id) ON DELETE CASCADE,
+  dispatch_date TEXT NOT NULL,
+  dispatch_qty REAL NOT NULL CHECK(dispatch_qty >= 0),
+  process_loss REAL DEFAULT 0 CHECK(process_loss >= 0),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `);
 }
 
@@ -193,6 +211,10 @@ JOIN products p ON p.id = o.product_id;
 `);
   }
 
+  if (!columnExists(db, "orders", "client_po_no")) {
+    db.exec(`ALTER TABLE orders ADD COLUMN client_po_no TEXT;`);
+  }
+
   db.exec(`
 UPDATE orders SET order_kgs = (
   SELECT COALESCE(SUM(oli.order_kgs), 0) FROM order_line_items oli WHERE oli.order_id = orders.id
@@ -206,6 +228,7 @@ SELECT
   oli.id AS id,
   o.id AS order_id,
   o.wo_no,
+  o.client_po_no,
   o.order_date,
   c.name AS client_name,
   oli.size,
@@ -241,7 +264,14 @@ SELECT
     WHEN o.paid_amount > 0 THEN 'Partial'
     ELSE 'Pending'
   END AS payment_status,
-  o.remarks
+  o.remarks,
+  COALESCE((
+    SELECT SUM(pr.weight_received * pe.rate) / NULLIF(SUM(pr.weight_received), 0)
+    FROM purchase_receipts pr
+    JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
+    JOIN products prod ON prod.id = pe.product_id
+    WHERE prod.item = oli.item AND prod.size = oli.size AND prod.grade = oli.grade
+  ), 0) AS actual_avg_price
 FROM order_line_items oli
 JOIN orders o ON o.id = oli.order_id
 JOIN clients c ON c.id = o.client_id
@@ -263,6 +293,9 @@ function migratePurchaseSchema(db: Db) {
   }
   if (!columnExists(db, "purchase_entries", "rec_note")) {
     db.exec(`ALTER TABLE purchase_entries ADD COLUMN rec_note TEXT`);
+  }
+  if (!columnExists(db, "purchase_entries", "client_po_no")) {
+    db.exec(`ALTER TABLE purchase_entries ADD COLUMN client_po_no TEXT`);
   }
   db.exec(`
 CREATE TABLE IF NOT EXISTS purchase_receipts (
@@ -332,6 +365,9 @@ CREATE TABLE IF NOT EXISTS dispatch_tally_bills (
   if (!columnExists(db, "dispatch_entries", "sales_rate")) {
     db.exec(`ALTER TABLE dispatch_entries ADD COLUMN sales_rate REAL DEFAULT 0 CHECK(sales_rate >= 0);`);
   }
+  if (!columnExists(db, "dispatch_entries", "packing_weight")) {
+    db.exec(`ALTER TABLE dispatch_entries ADD COLUMN packing_weight REAL DEFAULT 0 CHECK(packing_weight >= 0);`);
+  }
 }
 
 export function seed(db: Db) {
@@ -343,12 +379,12 @@ export function seed(db: Db) {
   const insProduct = db.prepare(`INSERT INTO products(size,item,grade) VALUES (?,?,?)`);
   const insOrder = db.prepare(`
     INSERT INTO orders(
-      wo_no, order_date, client_id, product_id, length_nos, order_kgs,
+      wo_no, client_po_no, order_date, client_id, product_id, length_nos, order_kgs,
       or_no, sales_date, weight_sold, sales_return,
       avg_cost, bill_rate,
       invoice_no, invoice_total, paid_amount
     ) VALUES (
-      @wo_no, @order_date, @client_id, @product_id, @length_nos, @order_kgs,
+      @wo_no, @client_po_no, @order_date, @client_id, @product_id, @length_nos, @order_kgs,
       @or_no, @sales_date, @weight_sold, @sales_return,
       @avg_cost, @bill_rate,
       @invoice_no, @invoice_total, @paid_amount
@@ -366,6 +402,7 @@ export function seed(db: Db) {
   const o1 = Number(
     insOrder.run({
       wo_no: "WO-1001",
+      client_po_no: "PO-001",
       order_date: "2026-04-01",
       client_id: clientA,
       product_id: prod1,
@@ -386,6 +423,7 @@ export function seed(db: Db) {
   const o2 = Number(
     insOrder.run({
       wo_no: "WO-1002",
+      client_po_no: "PO-002",
       order_date: "2026-04-02",
       client_id: clientB,
       product_id: prod2,

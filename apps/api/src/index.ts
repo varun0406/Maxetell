@@ -14,6 +14,7 @@ import { registerInventoryRoutes } from "./routes/inventory.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { extractBearer, parseAuthToken } from "./auth.js";
 import { registerReturnsRoutes } from "./routes/returns.js";
+import { registerJobWorkRoutes } from "./routes/jobwork.js";
 
 const env = loadEnv(process.env);
 
@@ -66,5 +67,6 @@ await registerPaymentsRoutes(app, { db });
 await registerMastersRoutes(app, { db });
 await registerInventoryRoutes(app, { db });
 await registerReturnsRoutes(app, { db });
+await registerJobWorkRoutes(app, { db });
 
 await app.listen({ port: env.PORT, host: env.HOST });

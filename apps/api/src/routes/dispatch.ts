@@ -11,6 +11,7 @@ const CreateDispatchBody = z.object({
   bundle_no: z.string().trim().optional(),
   transport: z.string().trim().optional(),
   sales_rate: z.coerce.number().min(0).optional(),
+  packing_weight: z.coerce.number().min(0).optional(),
   tally_bill_nos: z.array(z.string().trim().min(1)).optional(),
 });
 
@@ -20,6 +21,7 @@ const PatchDispatchBody = z.object({
   bundle_no: z.string().trim().optional().nullable(),
   transport: z.string().trim().optional().nullable(),
   sales_rate: z.coerce.number().min(0).optional(),
+  packing_weight: z.coerce.number().min(0).optional(),
 });
 
 const AddTallyBillBody = z.object({
@@ -94,8 +96,15 @@ export async function registerDispatchRoutes(app: FastifyInstance, opts: { db: D
 
     const rows = db
       .prepare(
-        `SELECT de.id, de.order_id, de.order_line_item_id, de.dispatch_date, de.dispatch_weight, de.dispatch_pcs, de.bundle_no, de.transport, de.sales_rate, de.created_at,
-                oli.item, oli.size, oli.grade
+        `SELECT de.id, de.order_id, de.order_line_item_id, de.dispatch_date, de.dispatch_weight, de.dispatch_pcs, de.bundle_no, de.transport, de.sales_rate, de.packing_weight, de.created_at,
+                oli.item, oli.size, oli.grade,
+                COALESCE((
+                  SELECT SUM(pr.weight_received * pe.rate) / NULLIF(SUM(pr.weight_received), 0)
+                  FROM purchase_receipts pr
+                  JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
+                  JOIN products prod ON prod.id = pe.product_id
+                  WHERE prod.item = oli.item AND prod.size = oli.size AND prod.grade = oli.grade
+                ), 0) AS actual_avg_price
          FROM dispatch_entries de
          LEFT JOIN order_line_items oli ON oli.id = de.order_line_item_id
          WHERE de.order_id = ?
@@ -138,8 +147,8 @@ export async function registerDispatchRoutes(app: FastifyInstance, opts: { db: D
     // For WO-level dispatch, order_line_item_id is not set.
     const info = db
       .prepare(
-        `INSERT INTO dispatch_entries(order_id, order_line_item_id, dispatch_date, dispatch_weight, dispatch_pcs, bundle_no, transport, sales_rate)
-         VALUES (?,?,?,?,?,?,?,?)`,
+        `INSERT INTO dispatch_entries(order_id, order_line_item_id, dispatch_date, dispatch_weight, dispatch_pcs, bundle_no, transport, sales_rate, packing_weight)
+         VALUES (?,?,?,?,?,?,?,?,?)`,
       )
       .run(
         orderId,
@@ -150,6 +159,7 @@ export async function registerDispatchRoutes(app: FastifyInstance, opts: { db: D
         body.bundle_no?.trim() || null,
         body.transport ?? null,
         body.sales_rate ?? 0,
+        body.packing_weight ?? 0,
       );
 
     const dispatchId = Number(info.lastInsertRowid);
@@ -168,8 +178,15 @@ export async function registerDispatchRoutes(app: FastifyInstance, opts: { db: D
     if (!Number.isFinite(lineId)) return reply.code(400).send({ error: "Invalid line id" });
     const rows = db
       .prepare(
-        `SELECT de.id, de.order_id, de.order_line_item_id, de.dispatch_date, de.dispatch_weight, de.dispatch_pcs, de.bundle_no, de.transport, de.sales_rate, de.created_at,
-                oli.item, oli.size, oli.grade
+        `SELECT de.id, de.order_id, de.order_line_item_id, de.dispatch_date, de.dispatch_weight, de.dispatch_pcs, de.bundle_no, de.transport, de.sales_rate, de.packing_weight, de.created_at,
+                oli.item, oli.size, oli.grade,
+                COALESCE((
+                  SELECT SUM(pr.weight_received * pe.rate) / NULLIF(SUM(pr.weight_received), 0)
+                  FROM purchase_receipts pr
+                  JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
+                  JOIN products prod ON prod.id = pe.product_id
+                  WHERE prod.item = oli.item AND prod.size = oli.size AND prod.grade = oli.grade
+                ), 0) AS actual_avg_price
          FROM dispatch_entries de
          LEFT JOIN order_line_items oli ON oli.id = de.order_line_item_id
          WHERE de.order_line_item_id = ?
@@ -212,8 +229,8 @@ export async function registerDispatchRoutes(app: FastifyInstance, opts: { db: D
 
     const info = db
       .prepare(
-        `INSERT INTO dispatch_entries(order_id, order_line_item_id, dispatch_date, dispatch_weight, dispatch_pcs, bundle_no, transport, sales_rate)
-         VALUES (?,?,?,?,?,?,?,?)`,
+        `INSERT INTO dispatch_entries(order_id, order_line_item_id, dispatch_date, dispatch_weight, dispatch_pcs, bundle_no, transport, sales_rate, packing_weight)
+         VALUES (?,?,?,?,?,?,?,?,?)`,
       )
       .run(
         lineExists.order_id,
@@ -224,6 +241,7 @@ export async function registerDispatchRoutes(app: FastifyInstance, opts: { db: D
         body.bundle_no?.trim() || null,
         body.transport ?? null,
         body.sales_rate ?? 0,
+        body.packing_weight ?? 0,
       );
 
     const dispatchId = Number(info.lastInsertRowid);

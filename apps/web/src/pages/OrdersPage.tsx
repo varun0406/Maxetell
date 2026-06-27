@@ -19,6 +19,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import CheckIcon from "@mui/icons-material/Check";
 import { Link as RouterLink } from "react-router-dom";
 import dayjs from "dayjs";
 import {
@@ -93,6 +94,7 @@ export function OrdersPage() {
   const [dispatchDate, setDispatchDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [dispatchWeight, setDispatchWeight] = useState<number>(0);
   const [dispatchPcs, setDispatchPcs] = useState<number>(0);
+  const [packingWeight, setPackingWeight] = useState<number>(0);
   const [bundleNo, setBundleNo] = useState("");
   const [transport, setTransport] = useState("");
   const [tallyBillsInput, setTallyBillsInput] = useState("");
@@ -234,6 +236,7 @@ export function OrdersPage() {
         dispatch_pcs: dispatchPcs,
         bundle_no: bundleNo.trim() || undefined,
         transport: transport.trim() || undefined,
+        packing_weight: packingWeight,
         tally_bill_nos: tallyBillsInput
           .split(/[\n,]+/g)
           .map((s) => s.trim())
@@ -248,6 +251,7 @@ export function OrdersPage() {
       });
       setDispatchWeight(0);
       setDispatchPcs(0);
+      setPackingWeight(0);
       setBundleNo("");
       setTransport("");
       setTallyBillsInput("");
@@ -385,8 +389,8 @@ export function OrdersPage() {
             sx={{
               display: "grid",
               gridTemplateColumns:
-                "120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
-              minWidth: 2140,
+                "120px 120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
+              minWidth: 2260,
               gap: 0,
               borderBottom: "1px solid rgba(15, 23, 42, 0.08)",
               position: "sticky",
@@ -397,6 +401,7 @@ export function OrdersPage() {
             {[
               "Date",
               "WO No",
+              "Client PO",
               "Client",
               "Product",
               "SIZE",
@@ -431,8 +436,8 @@ export function OrdersPage() {
                 sx={{
                   display: "grid",
                   gridTemplateColumns:
-                    "120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
-                  minWidth: 2140,
+                    "120px 120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
+                  minWidth: 2260,
                   borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
                   cursor: "pointer",
                   "&:hover": { background: "rgba(37, 99, 235, 0.04)" },
@@ -440,6 +445,7 @@ export function OrdersPage() {
               >
                 <Cell>{r.order_date}</Cell>
                 <Cell strong>{r.wo_no}</Cell>
+                <Cell>{r.client_po_no || "—"}</Cell>
                 <Cell>{r.client_name}</Cell>
                 <Cell>{r.item}</Cell>
                 <Cell>
@@ -453,7 +459,14 @@ export function OrdersPage() {
                 <Cell>{pcs(r.dispatch_pcs)}</Cell>
                 <Cell highlight={pending ? "warning" : undefined}>{kg(r.balance_kgs)}</Cell>
                 <Cell highlight={pending ? "warning" : undefined}>{pcs(r.balance_pcs)}</Cell>
-                <Cell>{money(r.avg_cost)}</Cell>
+                <Cell>
+                  {money(r.avg_cost)}
+                  {r.actual_avg_price > 0 && (
+                    <Typography variant="caption" display="block" color="text.secondary" sx={{ fontSize: 10, lineHeight: 1 }}>
+                      Act: ₹{money(r.actual_avg_price)}
+                    </Typography>
+                  )}
+                </Cell>
                 <Cell>{money(r.bill_rate)}</Cell>
                 <Cell>{r.invoice_no ?? "—"}</Cell>
                 <Cell highlight={loss ? "error" : "success"}>{money(r.profit_per_kg)}</Cell>
@@ -474,8 +487,8 @@ export function OrdersPage() {
             sx={{
               display: "grid",
               gridTemplateColumns:
-                "120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
-              minWidth: 2140,
+                "120px 120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
+              minWidth: 2260,
               borderTop: "2px solid rgba(15, 23, 42, 0.12)",
               background: "rgba(15, 23, 42, 0.02)",
               position: "sticky",
@@ -484,6 +497,7 @@ export function OrdersPage() {
             }}
           >
             <Cell strong>Total</Cell>
+            <Cell>{" "}</Cell>
             <Cell>{" "}</Cell>
             <Cell>{" "}</Cell>
             <Cell>{" "}</Cell>
@@ -560,6 +574,26 @@ export function OrdersPage() {
 
             <Divider sx={{ my: 2 }} />
 
+            {Math.abs(selected.order_kgs - selected.dispatch_weight) > 0.01 && selected.dispatch_weight > 0 && (
+              <Button
+                variant="contained"
+                color="warning"
+                startIcon={<CheckIcon />}
+                size="small"
+                fullWidth
+                sx={{ mb: 2, textTransform: "none", fontWeight: 700 }}
+                disabled={saving}
+                onClick={async () => {
+                  await saveLinePatch(selected.id, {
+                    order_kgs: selected.dispatch_weight,
+                    order_pcs: selected.dispatch_pcs ?? 0,
+                  });
+                }}
+              >
+                Auto Close Client PO
+              </Button>
+            )}
+
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
               <Typography variant="subtitle2" fontWeight={800}>
                 Work order
@@ -574,6 +608,7 @@ export function OrdersPage() {
                       onClick={async () => {
                         await saveMetaPatch(selected.order_id, {
                           wo_no: selected.wo_no,
+                          client_po_no: selected.client_po_no || null,
                           order_date: selected.order_date,
                           client_name: selected.client_name,
                           remarks: selected.remarks || undefined,
@@ -601,6 +636,13 @@ export function OrdersPage() {
                 size="small"
                 value={selected.wo_no}
                 onChange={(e) => setSelected({ ...selected, wo_no: e.target.value })}
+                disabled={saving || !editWo}
+              />
+              <TextField
+                label="Client PO No"
+                size="small"
+                value={selected.client_po_no || ""}
+                onChange={(e) => setSelected({ ...selected, client_po_no: e.target.value })}
                 disabled={saving || !editWo}
               />
               <TextField
@@ -774,6 +816,7 @@ export function OrdersPage() {
                 value={selected.avg_cost}
                 onChange={(e) => setSelected({ ...selected, avg_cost: Number(e.target.value) })}
                 disabled={saving || !editBilling}
+                helperText={`Actual Average Price: ₹${money(selected.actual_avg_price)}`}
               />
               <TextField
                 label="Invoice No"
@@ -857,6 +900,14 @@ export function OrdersPage() {
                     size="small"
                     value={transport}
                     onChange={(e) => setTransport(e.target.value)}
+                    sx={{ flex: 1.5 }}
+                  />
+                  <TextField
+                    label="Packing Weight"
+                    size="small"
+                    type="number"
+                    value={packingWeight || ""}
+                    onChange={(e) => setPackingWeight(Number(e.target.value))}
                     sx={{ flex: 1 }}
                   />
                   <Button variant="contained" disabled={saving || dispatchWeight <= 0} onClick={addDispatch}>
@@ -894,6 +945,7 @@ export function OrdersPage() {
                         <b>{d.dispatch_date}</b>
                         <span>
                           {Math.round(d.dispatch_weight)} kg / {Math.round(d.dispatch_pcs || 0)} pcs
+                          {d.packing_weight ? ` (Packing: ${d.packing_weight} kg)` : ""}
                         </span>
                         <span style={{ color: "rgba(15,23,42,0.55)" }}>{d.bundle_no ?? "—"}</span>
                         <span style={{ color: "rgba(15,23,42,0.55)" }}>{d.transport ?? "—"}</span>

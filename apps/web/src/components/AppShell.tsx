@@ -22,6 +22,7 @@ import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import { Link, useLocation } from "react-router-dom";
 
 const drawerWidth = 260;
@@ -36,6 +37,7 @@ const nav = [
   { to: "/inventory", label: "Inventory", icon: <Inventory2OutlinedIcon /> },
   { to: "/payments", label: "Payments", icon: <PaymentsOutlinedIcon /> },
   { to: "/returns", label: "Returns", icon: <ReceiptLongOutlinedIcon /> },
+  { to: "/jobwork", label: "Job Work", icon: <AssignmentOutlinedIcon /> },
   { to: "/users", label: "Users", icon: <PersonAddOutlinedIcon /> },
 ];
 

@@ -12,6 +12,7 @@ function maxReceivableForPo(poWeight: number): number {
 const CreatePurchaseBody = z.object({
   supplier_name: z.string().trim().min(1),
   po_no: z.string().trim().optional(),
+  client_po_no: z.string().trim().optional(),
   purchase_date: z.string().min(10),
   weight: z.coerce.number().positive(),
   rate: z.coerce.number().min(0),
@@ -25,6 +26,7 @@ const CreatePurchaseBody = z.object({
 const CreatePurchaseBatchBody = z.object({
   supplier_name: z.string().trim().min(1),
   po_no: z.string().trim().optional(),
+  client_po_no: z.string().trim().optional(),
   purchase_date: z.string().min(10),
   lines: z
     .array(
@@ -58,6 +60,7 @@ const CreateReceiptBody = z.object({
 const PatchPurchaseBody = z.object({
   supplier_name: z.string().trim().min(1).optional(),
   po_no: z.string().trim().optional().nullable(),
+  client_po_no: z.string().trim().optional().nullable(),
   purchase_date: z.string().min(10).optional(),
   weight: z.coerce.number().positive().optional(),
   rate: z.coerce.number().min(0).optional(),
@@ -81,6 +84,7 @@ function ledgerRow(db: Db, id: number) {
       `SELECT
          pe.id,
          pe.po_no,
+         pe.client_po_no,
          pe.purchase_date,
          pe.weight,
          pe.received_weight,
@@ -94,7 +98,13 @@ function ledgerRow(db: Db, id: number) {
          s.name AS supplier_name,
          pr.size AS size,
          pr.item AS item,
-         pr.grade AS grade
+         pr.grade AS grade,
+         COALESCE((
+           SELECT SUM(pr2.weight_received * pe2.rate) / NULLIF(SUM(pr2.weight_received), 0)
+           FROM purchase_receipts pr2
+           JOIN purchase_entries pe2 ON pe2.id = pr2.purchase_entry_id
+           WHERE pe2.product_id = pe.product_id
+         ), 0) AS actual_avg_price
        FROM purchase_entries pe
        JOIN suppliers s ON s.id = pe.supplier_id
        LEFT JOIN products pr ON pr.id = pe.product_id
@@ -131,6 +141,7 @@ export async function registerPurchaseRoutes(app: FastifyInstance, opts: { db: D
 SELECT
   pe.id,
   pe.po_no,
+  pe.client_po_no,
   pe.purchase_date,
   pe.weight,
   pe.received_weight,
@@ -144,7 +155,13 @@ SELECT
   s.name AS supplier_name,
   pr.size AS size,
   pr.item AS item,
-  pr.grade AS grade
+  pr.grade AS grade,
+  COALESCE((
+    SELECT SUM(pr2.weight_received * pe2.rate) / NULLIF(SUM(pr2.weight_received), 0)
+    FROM purchase_receipts pr2
+    JOIN purchase_entries pe2 ON pe2.id = pr2.purchase_entry_id
+    WHERE pe2.product_id = pe.product_id
+  ), 0) AS actual_avg_price
 FROM purchase_entries pe
 JOIN suppliers s ON s.id = pe.supplier_id
 LEFT JOIN products pr ON pr.id = pe.product_id
@@ -191,10 +208,10 @@ LIMIT 500
 
     const info = db
       .prepare(
-        `INSERT INTO purchase_entries(supplier_id, product_id, po_no, purchase_date, weight, rate, received_weight, debit_note, remarks)
-         VALUES (?,?,?,?,?,?,0,?,?)`,
+        `INSERT INTO purchase_entries(supplier_id, product_id, po_no, client_po_no, purchase_date, weight, rate, received_weight, debit_note, remarks)
+         VALUES (?,?,?,?,?,?,?,0,?,?)`,
       )
-      .run(supplierId, productId, body.po_no ?? null, body.purchase_date, body.weight, body.rate, body.debit_note ?? null, body.remarks ?? null);
+      .run(supplierId, productId, body.po_no ?? null, body.client_po_no ?? null, body.purchase_date, body.weight, body.rate, body.debit_note ?? null, body.remarks ?? null);
 
     const id = Number(info.lastInsertRowid);
     return { data: ledgerRow(db, id) };
@@ -208,8 +225,8 @@ LIMIT 500
       const created = db.transaction(() => {
         const supplierId = resolveSupplierId(db, body.supplier_name);
         const ins = db.prepare(
-          `INSERT INTO purchase_entries(supplier_id, product_id, po_no, purchase_date, weight, rate, received_weight, debit_note, remarks)
-           VALUES (?,?,?,?,?,?,0,?,?)`,
+          `INSERT INTO purchase_entries(supplier_id, product_id, po_no, client_po_no, purchase_date, weight, rate, received_weight, debit_note, remarks)
+           VALUES (?,?,?,?,?,?,?,0,?,?)`,
         );
         const ids: number[] = [];
         for (const l of body.lines) {
@@ -218,6 +235,7 @@ LIMIT 500
             supplierId,
             productId,
             body.po_no ?? null,
+            body.client_po_no ?? null,
             body.purchase_date,
             l.weight,
             l.rate,
@@ -309,7 +327,7 @@ LIMIT 500
       fields.push(`product_id = @product_id`);
       binds.product_id = nextProductId;
     }
-    for (const key of ["po_no", "purchase_date", "weight", "rate", "debit_note", "rec_note", "remarks"] as const) {
+    for (const key of ["po_no", "client_po_no", "purchase_date", "weight", "rate", "debit_note", "rec_note", "remarks"] as const) {
       if ((body as any)[key] !== undefined) {
         fields.push(`${key} = @${key}`);
         binds[key] = (body as any)[key] ?? null;

@@ -25,6 +25,7 @@ export function DispatchPage() {
   const [selectedWO, setSelectedWO] = useState<{
     order_id: number;
     wo_no: string;
+    client_po_no: string | null;
     client_name: string;
     order_date: string;
   } | null>(null);
@@ -36,6 +37,7 @@ export function DispatchPage() {
   const [bundleNo, setBundleNo] = useState("");
   const [transport, setTransport] = useState("");
   const [salesRate, setSalesRate] = useState<number>(0);
+  const [packingWeight, setPackingWeight] = useState<number>(0);
   const [tallyBillsInput, setTallyBillsInput] = useState("");
   const [retainDetails, setRetainDetails] = useState(true);
 
@@ -69,6 +71,7 @@ export function DispatchPage() {
     const list: Array<{
       order_id: number;
       wo_no: string;
+      client_po_no: string | null;
       client_name: string;
       order_date: string;
     }> = [];
@@ -79,6 +82,7 @@ export function DispatchPage() {
         list.push({
           order_id: o.order_id,
           wo_no: o.wo_no || "N/A",
+          client_po_no: o.client_po_no,
           client_name: o.client_name,
           order_date: o.order_date,
         });
@@ -118,6 +122,7 @@ export function DispatchPage() {
         bundle_no: bundleNo.trim() || undefined,
         transport: transport.trim() || undefined,
         sales_rate: salesRate,
+        packing_weight: packingWeight,
         tally_bill_nos: tallyBillsInput
           .split(/[\n,]+/g)
           .map((s) => s.trim())
@@ -139,6 +144,7 @@ export function DispatchPage() {
       setDispatchPcs(0);
       setBundleNo("");
       setSalesRate(0);
+      setPackingWeight(0);
       if (!retainDetails) {
         setTransport("");
         setTallyBillsInput("");
@@ -178,12 +184,12 @@ export function DispatchPage() {
                 setSelectedWO(v);
                 setOrder(null);
               }}
-              getOptionLabel={(o) => `${o.wo_no} • ${o.client_name}`}
+              getOptionLabel={(o) => `${o.wo_no} ${o.client_po_no ? `(PO: ${o.client_po_no})` : ""} • ${o.client_name}`}
               renderInput={(params) => (
                 <TextField
                   {...params}
                   label="Select Work Order"
-                  placeholder="Search WO number or client name…"
+                  placeholder="Search WO, Client PO, or client name…"
                   InputProps={{
                     ...params.InputProps,
                     endAdornment: (
@@ -313,6 +319,14 @@ export function DispatchPage() {
                 fullWidth
                 disabled={!order || saving}
               />
+              <TextField
+                label="Packing Weight (kg)"
+                type="number"
+                value={packingWeight || ""}
+                onChange={(e) => setPackingWeight(Number(e.target.value))}
+                fullWidth
+                disabled={!order || saving}
+              />
             </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
@@ -351,6 +365,7 @@ export function DispatchPage() {
                 placeholder="0.00"
                 fullWidth
                 disabled={!order || saving}
+                helperText={order?.actual_avg_price ? `Actual Average Price: ₹${order.actual_avg_price.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : undefined}
               />
             </Stack>
 
@@ -421,10 +436,20 @@ export function DispatchPage() {
                   </Box>
                   <Typography variant="body2">
                     {Math.round(e.dispatch_weight)} kg / {Math.round(e.dispatch_pcs || 0)} pcs
+                    {e.packing_weight ? ` (Packing: ${e.packing_weight} kg)` : ""}
                   </Typography>
                   <Typography color="text.secondary" variant="body2">{e.bundle_no ?? "—"}</Typography>
                   <Typography color="text.secondary" variant="body2">{e.transport ?? "—"}</Typography>
-                  <Typography color="text.secondary" variant="body2">{e.sales_rate ? `₹${e.sales_rate}` : "—"}</Typography>
+                   <Box>
+                     <Typography color="text.secondary" variant="body2">
+                       {e.sales_rate ? `₹${e.sales_rate}` : "—"}
+                     </Typography>
+                     {e.actual_avg_price && e.actual_avg_price > 0 ? (
+                       <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, lineHeight: 1 }}>
+                         Act: ₹{e.actual_avg_price.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                       </Typography>
+                     ) : null}
+                   </Box>
                   <Typography color="text.secondary" variant="body2" sx={{ flexGrow: 1, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                     {e.tally_bill_nos && e.tally_bill_nos.length ? e.tally_bill_nos.join(", ") : "—"}
                   </Typography>
@@ -440,6 +465,7 @@ export function DispatchPage() {
                         setBundleNo(e.bundle_no || "");
                         setTransport(e.transport || "");
                         setSalesRate(e.sales_rate || 0);
+                        setPackingWeight(e.packing_weight || 0);
                         setTallyBillsInput(e.tally_bill_nos?.join(", ") || "");
 
                         if (e.order_line_item_id) {

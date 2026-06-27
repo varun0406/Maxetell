@@ -74,6 +74,7 @@ export type OrderRow = {
   /** Work order / header id (dispatch, payments, invoice) */
   order_id: number;
   wo_no: string;
+  client_po_no: string | null;
   order_date: string;
   client_name: string;
   size: string;
@@ -87,6 +88,7 @@ export type OrderRow = {
   balance_kgs: number;
   balance_pcs: number;
   avg_cost: number;
+  actual_avg_price: number;
   bill_rate: number;
   profit_per_kg: number;
   or_no: string | null;
@@ -123,6 +125,7 @@ export type CreateOrderLine = {
 
 export async function createOrder(body: {
   wo_no: string;
+  client_po_no?: string | null;
   order_date: string;
   client_name: string;
   remarks?: string;
@@ -142,7 +145,7 @@ export async function patchOrder(
 
 export async function patchOrderMeta(
   orderId: number,
-  body: Partial<Pick<OrderRow, "wo_no" | "order_date" | "client_name" | "remarks">>,
+  body: Partial<Pick<OrderRow, "wo_no" | "client_po_no" | "order_date" | "client_name" | "remarks">>,
 ) {
   const res = await api.patch<{ data: OrderRow[] }>(`/orders/${orderId}/meta`, body);
   return res.data.data;
@@ -247,6 +250,7 @@ export type ProductStockRow = {
   dispatches: number;
   sales_returns: number;
   current_stock: number;
+  actual_avg_price: number;
 };
 
 export async function fetchProductStockBreakdown() {
@@ -264,6 +268,27 @@ export type ProductLedgerRow = {
 
 export async function fetchProductLedger(productId: number) {
   const res = await api.get<{ data: ProductLedgerRow[] }>(`/dashboard/product_ledger/${productId}`);
+  return res.data.data;
+}
+
+export type InventoryLedgerRow = {
+  transaction_type: string;
+  date: string;
+  product_id: number;
+  item: string;
+  size: string;
+  grade: string;
+  inward_quantity: number;
+  outward_quantity: number;
+  balance_quantity: number;
+  reference_number: string | null;
+  client_po: string | null;
+  rate: number;
+  actual_avg_price: number;
+};
+
+export async function fetchInventoryLedger() {
+  const res = await api.get<{ data: InventoryLedgerRow[] }>("/inventory/ledger");
   return res.data.data;
 }
 
@@ -293,6 +318,8 @@ export type DispatchEntry = {
   bundle_no: string | null;
   transport: string | null;
   sales_rate: number;
+  packing_weight: number;
+  actual_avg_price?: number;
   tally_bill_nos?: string[];
   created_at: string;
 };
@@ -306,6 +333,7 @@ export async function createDispatch(
     bundle_no?: string;
     transport?: string;
     sales_rate?: number;
+    packing_weight?: number;
     tally_bill_nos?: string[];
   },
 ) {
@@ -333,6 +361,7 @@ export async function createDispatchForLine(
     bundle_no?: string;
     transport?: string;
     sales_rate?: number;
+    packing_weight?: number;
     tally_bill_nos?: string[];
   },
 ) {
@@ -347,7 +376,7 @@ export async function addDispatchTallyBill(dispatchId: number, bill_no: string) 
 
 export async function patchDispatch(
   dispatchId: number,
-  body: Partial<Pick<DispatchEntry, "dispatch_date" | "dispatch_weight" | "dispatch_pcs" | "bundle_no" | "transport" | "sales_rate">>,
+  body: Partial<Pick<DispatchEntry, "dispatch_date" | "dispatch_weight" | "dispatch_pcs" | "bundle_no" | "transport" | "sales_rate" | "packing_weight">>,
 ) {
   const res = await api.patch<{ data: OrderRow[] }>(`/dispatch/${dispatchId}`, body);
   return res.data.data;
@@ -361,6 +390,7 @@ export async function deleteDispatch(dispatchId: number) {
 export type PurchaseLedgerRow = {
   id: number;
   po_no: string | null;
+  client_po_no: string | null;
   purchase_date: string;
   supplier_name: string;
   size: string | null;
@@ -375,11 +405,13 @@ export type PurchaseLedgerRow = {
   debit_note: string | null;
   rec_note: string | null;
   remarks: string | null;
+  actual_avg_price: number;
 };
 
 export async function createPurchase(body: {
   supplier_name: string;
   po_no?: string;
+  client_po_no?: string;
   purchase_date: string;
   weight: number;
   rate: number;
@@ -396,6 +428,7 @@ export async function createPurchase(body: {
 export async function createPurchaseBatch(body: {
   supplier_name: string;
   po_no?: string;
+  client_po_no?: string;
   purchase_date: string;
   lines: Array<{
     weight: number;
@@ -440,7 +473,7 @@ export async function createPurchaseReceipt(
 export async function patchPurchase(
   purchaseId: number,
   body: Partial<
-    Pick<PurchaseLedgerRow, "supplier_name" | "po_no" | "purchase_date" | "weight" | "rate" | "debit_note" | "rec_note" | "size" | "item" | "grade" | "remarks">
+    Pick<PurchaseLedgerRow, "supplier_name" | "po_no" | "client_po_no" | "purchase_date" | "weight" | "rate" | "debit_note" | "rec_note" | "size" | "item" | "grade" | "remarks">
   >,
 ) {
   const res = await api.patch<{ data: PurchaseLedgerRow }>(`/purchase/${purchaseId}`, body);
@@ -536,5 +569,51 @@ export async function createPurchaseReturn(body: { purchase_entry_id: number; re
 export async function deletePurchaseReturn(id: number) {
   const res = await api.delete<{ data: { success: true } }>(`/returns/purchase/${id}`);
   return res.data.data;
+}
+
+export type JobWorkOutward = {
+  id: number;
+  inward_id: number;
+  dispatch_date: string;
+  dispatch_qty: number;
+  process_loss: number;
+  created_at: string;
+};
+
+export type JobWorkInward = {
+  id: number;
+  challan_date: string;
+  description: string;
+  qty: number;
+  short_qty: number;
+  created_at: string;
+  final_qty: number;
+  dispatches: JobWorkOutward[];
+  total_dispatched: number;
+  total_loss: number;
+  balance: number;
+};
+
+export async function fetchJobWorkList() {
+  const res = await api.get<{ data: JobWorkInward[] }>("/jobwork");
+  return res.data.data;
+}
+
+export async function createJobWorkInward(body: { challan_date: string; description: string; qty: number; short_qty?: number }) {
+  const res = await api.post<{ data: { id: number } }>("/jobwork/inward", body);
+  return res.data.data;
+}
+
+export async function createJobWorkOutward(body: { inward_id: number; dispatch_date: string; dispatch_qty: number; process_loss?: number }) {
+  const res = await api.post<{ data: { id: number } }>("/jobwork/outward", body);
+  return res.data.data;
+}
+
+export async function deleteJobWorkInward(id: number) {
+  await api.delete(`/jobwork/inward/${id}`);
+}
+
+export async function deleteJobWorkOutward(id: number) {
+  await api.delete(`/jobwork/outward/${id}`);
 }
 

@@ -104,7 +104,7 @@ export function ReturnsPage() {
                 </option>
                 {orderChoices.map((o) => (
                   <option key={o.order_id} value={o.order_id}>
-                    {o.wo_no} — {o.client_name}
+                    {o.wo_no} {o.client_po_no ? `(PO: ${o.client_po_no})` : ""} — {o.client_name}
                   </option>
                 ))}
               </TextField>
@@ -175,7 +175,7 @@ export function ReturnsPage() {
                 </option>
                 {poChoices.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.po_no ?? `PO#${p.id}`} — {p.supplier_name} — {p.item ?? ""} {p.size ?? ""} {p.grade ?? ""}
+                    {p.po_no ?? `PO#${p.id}`} {p.client_po_no ? `(Client PO: ${p.client_po_no})` : ""} — {p.supplier_name} — {p.item ?? ""} {p.size ?? ""} {p.grade ?? ""}
                   </option>
                 ))}
               </TextField>

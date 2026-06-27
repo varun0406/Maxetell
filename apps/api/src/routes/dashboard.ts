@@ -157,10 +157,11 @@ FROM order_line_items oli
         COALESCE(pret.returns, 0) as purchase_returns,
         COALESCE(de.dispatches, 0) as dispatches,
         COALESCE(sret.returns, 0) as sales_returns,
-        (COALESCE(pr.receipts, 0) - COALESCE(pret.returns, 0) - COALESCE(de.dispatches, 0) + COALESCE(sret.returns, 0)) as current_stock
+        (COALESCE(pr.receipts, 0) - COALESCE(pret.returns, 0) - COALESCE(de.dispatches, 0) + COALESCE(sret.returns, 0)) as current_stock,
+        COALESCE(pr.avg_price, 0) as actual_avg_price
       FROM products p
       LEFT JOIN (
-        SELECT pe.product_id, SUM(pr.weight_received) as receipts
+        SELECT pe.product_id, SUM(pr.weight_received) as receipts, SUM(pr.weight_received * pe.rate) / NULLIF(SUM(pr.weight_received), 0) as avg_price
         FROM purchase_receipts pr
         JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
         GROUP BY pe.product_id

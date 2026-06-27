@@ -19,6 +19,7 @@ const PatchOrderBody = z.object({
 
 const PatchOrderMetaBody = z.object({
   wo_no: z.string().trim().min(1).optional(),
+  client_po_no: z.string().trim().optional().nullable(),
   order_date: z.string().min(10).optional(),
   client_name: z.string().trim().min(1).optional(),
   remarks: z.string().optional().nullable(),
@@ -49,6 +50,7 @@ const OrderLine = z.object({
 
 const CreateOrderBody = z.object({
   wo_no: z.string().trim().min(1),
+  client_po_no: z.string().trim().optional().nullable(),
   order_date: z.string().min(10),
   client_name: z.string().trim().min(1),
   remarks: z.string().optional().nullable(),
@@ -108,7 +110,7 @@ function buildListSql(params: z.infer<typeof ListOrdersQuery>) {
 
   if (params.q) {
     where.push(
-      `(wo_no LIKE @like OR client_name LIKE @like OR invoice_no LIKE @like OR or_no LIKE @like OR item LIKE @like)`,
+      `(wo_no LIKE @like OR client_name LIKE @like OR invoice_no LIKE @like OR or_no LIKE @like OR item LIKE @like OR client_po_no LIKE @like)`,
     );
     binds.like = `%${params.q}%`;
   }
@@ -165,11 +167,12 @@ export async function registerOrdersRoutes(app: FastifyInstance, opts: { db: Db 
     try {
       const orderInfo = db
         .prepare(
-          `INSERT INTO orders(wo_no, order_date, client_id, product_id, length_nos, order_kgs, avg_cost, bill_rate, remarks)
-           VALUES (?,?,?,?,?,?,0,0,?)`,
+          `INSERT INTO orders(wo_no, client_po_no, order_date, client_id, product_id, length_nos, order_kgs, avg_cost, bill_rate, remarks)
+           VALUES (?,?,?,?,?,?,?,0,0,?)`,
         )
         .run(
           body.wo_no,
+          body.client_po_no ?? null,
           body.order_date,
           clientId,
           first.productId,
@@ -222,6 +225,10 @@ export async function registerOrdersRoutes(app: FastifyInstance, opts: { db: Db 
     if (body.wo_no !== undefined) {
       fields.push(`wo_no = @wo_no`);
       binds.wo_no = body.wo_no;
+    }
+    if (body.client_po_no !== undefined) {
+      fields.push(`client_po_no = @client_po_no`);
+      binds.client_po_no = body.client_po_no;
     }
     if (body.order_date !== undefined) {
       fields.push(`order_date = @order_date`);

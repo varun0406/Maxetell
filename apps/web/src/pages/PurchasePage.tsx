@@ -20,6 +20,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
+import CheckIcon from "@mui/icons-material/Check";
 import dayjs from "dayjs";
 import {
   createPurchaseBatch,
@@ -43,6 +44,7 @@ export function PurchasePage() {
   const [tab, setTab] = useState(0);
   const [supplier, setSupplier] = useState("");
   const [poNo, setPoNo] = useState("");
+  const [clientPoNo, setClientPoNo] = useState("");
   const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [products, setProducts] = useState<MasterProduct[]>([]);
 
@@ -153,6 +155,7 @@ export function PurchasePage() {
       const created = await createPurchaseBatch({
         supplier_name: supplier.trim(),
         po_no: poNo.trim() || undefined,
+        client_po_no: clientPoNo.trim() || undefined,
         purchase_date: date,
         lines: clean.map((l) => ({
           weight: l.weight,
@@ -167,6 +170,7 @@ export function PurchasePage() {
       setRows((prev) => [...created, ...prev]);
       setSupplier("");
       setPoNo("");
+      setClientPoNo("");
       setPoLines([emptyPoLine()]);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to save");
@@ -206,6 +210,7 @@ export function PurchasePage() {
         PurchaseLedgerRow,
         | "supplier_name"
         | "po_no"
+        | "client_po_no"
         | "purchase_date"
         | "weight"
         | "rate"
@@ -307,6 +312,7 @@ export function PurchasePage() {
                   fullWidth
                 />
                 <TextField label="PO NO" value={poNo} onChange={(e) => setPoNo(e.target.value)} fullWidth />
+                <TextField label="CLIENT PO NO" value={clientPoNo} onChange={(e) => setClientPoNo(e.target.value)} fullWidth />
                 <TextField
                   label="DATE"
                   type="date"
@@ -422,6 +428,11 @@ export function PurchasePage() {
                             });
                           }}
                           fullWidth
+                          helperText={
+                            products.find(p => p.item === line.item && p.size === line.size && p.grade === line.grade)?.avg_cost 
+                            ? `Actual Average Price: ₹${products.find(p => p.item === line.item && p.size === line.size && p.grade === line.grade)?.avg_cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                            : undefined
+                          }
                         />
                         <TextField label="AMOUNT (wt × rate)" value={money(amountPreview)} disabled fullWidth />
                       </Stack>
@@ -558,8 +569,8 @@ export function PurchasePage() {
                 sx={{
                   display: "grid",
                   gridTemplateColumns:
-                    "100px 110px minmax(100px, 1fr) minmax(160px, 220px) 90px 90px 90px 80px 100px 110px 110px 120px 140px 160px",
-                  minWidth: 1640,
+                    "100px 100px 110px minmax(100px, 1fr) minmax(160px, 220px) 90px 90px 90px 80px 100px 110px 110px 120px 140px 160px",
+                  minWidth: 1740,
                   gap: 0.5,
                   alignItems: "center",
                   borderBottom: "1px solid rgba(15,23,42,0.1)",
@@ -570,6 +581,7 @@ export function PurchasePage() {
                 }}
               >
                 <span>PO NO</span>
+                <span>CLIENT PO</span>
                 <span>DATE</span>
                 <span>NAME</span>
                 <span>PRODUCT</span>
@@ -591,8 +603,8 @@ export function PurchasePage() {
                   sx={{
                     display: "grid",
                     gridTemplateColumns:
-                      "100px 110px minmax(100px, 1fr) minmax(160px, 220px) 90px 90px 90px 80px 100px 110px 110px 120px 140px 160px",
-                    minWidth: 1640,
+                      "100px 100px 110px minmax(100px, 1fr) minmax(160px, 220px) 90px 90px 90px 80px 100px 110px 110px 120px 140px 160px",
+                    minWidth: 1740,
                     gap: 0.5,
                     alignItems: "center",
                     border: "1px solid rgba(15,23,42,0.08)",
@@ -605,6 +617,7 @@ export function PurchasePage() {
                   }}
                 >
                   <span>{r.po_no ?? "—"}</span>
+                  <span>{r.client_po_no ?? "—"}</span>
                   <span>{r.purchase_date}</span>
                   <span>{r.supplier_name}</span>
                   <span title={productLabel(r)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -616,7 +629,14 @@ export function PurchasePage() {
                   <span title={r.debit_note ?? ""} style={{ fontSize: 11, overflow: "hidden", textOverflow: "ellipsis" }}>
                     {r.debit_note ? (r.debit_note.length > 14 ? `${r.debit_note.slice(0, 14)}…` : r.debit_note) : "—"}
                   </span>
-                  <span>{money(r.rate)}</span>
+                  <Box>
+                    <Typography variant="body2">{money(r.rate)}</Typography>
+                    {r.actual_avg_price > 0 && (
+                      <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 10, lineHeight: 1 }}>
+                        Act Avg: ₹{money(r.actual_avg_price)}
+                      </Typography>
+                    )}
+                  </Box>
                   <span>{money(r.amount_ordered)}</span>
                   <span style={{ color: r.amount_received > 0 ? "#16a34a" : undefined }}>{money(r.amount_received)}</span>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -669,6 +689,23 @@ export function PurchasePage() {
               <b>{money(drawerPo.balance_weight)}</b> kg
             </Typography>
 
+            {Math.abs(drawerPo.weight - drawerPo.received_weight) > 0.01 && drawerPo.received_weight > 0 && (
+              <Button
+                variant="contained"
+                color="warning"
+                startIcon={<CheckIcon />}
+                size="small"
+                fullWidth
+                sx={{ mb: 2, textTransform: "none", fontWeight: 700 }}
+                disabled={saving}
+                onClick={async () => {
+                  await saveDrawerPoPatch({ weight: drawerPo.received_weight });
+                }}
+              >
+                Auto Close Client PO
+              </Button>
+            )}
+
             <Typography fontWeight={800} sx={{ mb: 1 }}>
               PO details (editable)
             </Typography>
@@ -689,6 +726,15 @@ export function PurchasePage() {
                   value={drawerPo.po_no ?? ""}
                   onChange={(e) => setDrawerPo({ ...drawerPo, po_no: e.target.value || null })}
                   onBlur={() => saveDrawerPoPatch({ po_no: drawerPo.po_no })}
+                  disabled={saving}
+                  fullWidth
+                />
+                <TextField
+                  label="CLIENT PO"
+                  size="small"
+                  value={drawerPo.client_po_no ?? ""}
+                  onChange={(e) => setDrawerPo({ ...drawerPo, client_po_no: e.target.value || null })}
+                  onBlur={() => saveDrawerPoPatch({ client_po_no: drawerPo.client_po_no })}
                   disabled={saving}
                   fullWidth
                 />
@@ -753,6 +799,7 @@ export function PurchasePage() {
                   onBlur={() => saveDrawerPoPatch({ rate: drawerPo.rate })}
                   disabled={saving}
                   fullWidth
+                  helperText={`Actual Average Price: ₹${money(drawerPo.actual_avg_price)}`}
                 />
               </Stack>
               <Stack direction="row" spacing={1.5}>

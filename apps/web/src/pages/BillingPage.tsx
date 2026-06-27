@@ -99,8 +99,8 @@ export function BillingPage() {
               loading={loading}
               value={order}
               onChange={(_, v) => setOrder(v)}
-              getOptionLabel={(o) => `${o.wo_no} • ${o.client_name}`}
-              renderInput={(params) => <TextField {...params} label="Select WO / Client" />}
+              getOptionLabel={(o) => `${o.wo_no} ${o.client_po_no ? `(PO: ${o.client_po_no})` : ""} • ${o.client_name}`}
+              renderInput={(params) => <TextField {...params} label="Select WO / Client PO / Client" />}
             />
 
             {order ? (

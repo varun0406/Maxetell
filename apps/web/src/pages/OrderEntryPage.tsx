@@ -47,6 +47,7 @@ export function OrderEntryPage() {
   const [loading, setLoading] = useState(true);
 
   const [woNo, setWoNo] = useState("");
+  const [clientPoNo, setClientPoNo] = useState("");
   const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [client, setClient] = useState<MasterClient | null>(null);
   const [clientText, setClientText] = useState("");
@@ -109,6 +110,7 @@ export function OrderEntryPage() {
     try {
       const rows = await createOrder({
         wo_no: woNo.trim(),
+        client_po_no: clientPoNo.trim() || undefined,
         order_date: date,
         client_name: resolvedClientName,
         remarks: remarks.trim() || undefined,
@@ -116,6 +118,7 @@ export function OrderEntryPage() {
       });
       setCreated(rows);
       setWoNo("");
+      setClientPoNo("");
       setRemarks("");
       setLines([emptyLine()]);
     } catch (e: unknown) {
@@ -158,6 +161,13 @@ export function OrderEntryPage() {
                 value={woNo}
                 onChange={(e) => setWoNo(e.target.value)}
                 placeholder="WO-1003"
+                fullWidth
+              />
+              <TextField
+                label="Client PO No"
+                value={clientPoNo}
+                onChange={(e) => setClientPoNo(e.target.value)}
+                placeholder="Optional"
                 fullWidth
               />
               <TextField
@@ -293,6 +303,11 @@ export function OrderEntryPage() {
                       value={line.bill_rate || ""}
                       onChange={(e) => updateLine(index, { bill_rate: Number(e.target.value) })}
                       fullWidth
+                      helperText={
+                        products.find(p => p.item === line.item && p.size === line.size && p.grade === line.grade)?.avg_cost 
+                        ? `Actual Average Price: ₹${products.find(p => p.item === line.item && p.size === line.size && p.grade === line.grade)?.avg_cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                        : undefined
+                      }
                     />
                   </Stack>
                 </Stack>

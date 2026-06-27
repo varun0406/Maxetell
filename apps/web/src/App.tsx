@@ -12,6 +12,7 @@ import { PaymentsPage } from "./pages/PaymentsPage.tsx";
 import { LoginPage } from "./pages/LoginPage.tsx";
 import { ReturnsPage } from "./pages/ReturnsPage.tsx";
 import { UsersPage } from "./pages/UsersPage.tsx";
+import { JobWorkPage } from "./pages/JobWorkPage.tsx";
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="returns" element={<ReturnsPage />} />
+            <Route path="jobwork" element={<JobWorkPage />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
