@@ -179,10 +179,10 @@ FROM order_line_items oli
         GROUP BY o.product_id
       ) de ON de.product_id = p.id
       LEFT JOIN (
-        SELECT o.product_id, SUM(sret.weight) as returns
+        SELECT COALESCE(sret.product_id, o.product_id) as product_id, SUM(sret.weight) as returns
         FROM sales_returns sret
-        JOIN orders o ON o.id = sret.order_id
-        GROUP BY o.product_id
+        LEFT JOIN orders o ON o.id = sret.order_id
+        GROUP BY COALESCE(sret.product_id, o.product_id)
       ) sret ON sret.product_id = p.id
       WHERE (COALESCE(pr.receipts, 0) + COALESCE(pret.returns, 0) + COALESCE(de.dispatches, 0) + COALESCE(sret.returns, 0)) > 0
       ORDER BY p.item, p.size, p.grade
@@ -217,10 +217,10 @@ FROM order_line_items oli
       
       UNION ALL
       
-      SELECT 'Sales Return' as type, sret.return_date as date, sret.weight as weight, o.wo_no as ref
+      SELECT 'Sales Return' as type, sret.return_date as date, sret.weight as weight, COALESCE(o.wo_no, 'Old Return') as ref
       FROM sales_returns sret
-      JOIN orders o ON o.id = sret.order_id
-      WHERE o.product_id = ?
+      LEFT JOIN orders o ON o.id = sret.order_id
+      WHERE COALESCE(sret.product_id, o.product_id) = ?
       
       ORDER BY date ASC
     `).all(productId, productId, productId, productId) as { type: string, date: string, weight: number, ref: string | null }[];

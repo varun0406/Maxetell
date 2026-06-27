@@ -523,12 +523,18 @@ export async function createPayment(orderId: number, body: { payment_date: strin
 
 export type SalesReturnRow = {
   id: number;
-  order_id: number;
+  order_id: number | null;
+  product_id: number | null;
   return_date: string;
   weight: number;
   note: string | null;
   remarks: string | null;
   created_at: string;
+  order_wo_no?: string | null;
+  order_client_po_no?: string | null;
+  product_item?: string | null;
+  product_size?: string | null;
+  product_grade?: string | null;
 };
 
 export type PurchaseReturnRow = {
@@ -546,7 +552,14 @@ export async function fetchSalesReturns() {
   return res.data.data;
 }
 
-export async function createSalesReturn(body: { order_id: number; return_date: string; weight: number; note?: string; remarks?: string }) {
+export async function createSalesReturn(body: { 
+  order_id?: number | null; 
+  product_id?: number | null; 
+  return_date: string; 
+  weight: number; 
+  note?: string; 
+  remarks?: string;
+}) {
   const res = await api.post<{ data: { success: true } }>("/returns/sales", body);
   return res.data.data;
 }
@@ -615,5 +628,10 @@ export async function deleteJobWorkInward(id: number) {
 
 export async function deleteJobWorkOutward(id: number) {
   await api.delete(`/jobwork/outward/${id}`);
+}
+
+export async function mergeInventoryItems(body: { sourceName: string; targetName: string }) {
+  const res = await api.post<{ success: boolean }>("/inventory/merge-items", body);
+  return res.data;
 }
 

@@ -21,6 +21,7 @@ import {
   fetchProductStockBreakdown,
   fetchProductLedger,
   fetchInventoryLedger,
+  mergeInventoryItems,
   type ProductStockRow,
   type ProductLedgerRow,
   type InventoryLedgerRow
@@ -37,6 +38,11 @@ export function InventoryPage() {
   const [minimumDialog, setMinimumDialog] = useState(false);
   const [minimumInput, setMinimumInput] = useState<number>(0);
   const [savingMinimum, setSavingMinimum] = useState(false);
+
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [sourceItem, setSourceItem] = useState("");
+  const [targetItem, setTargetItem] = useState("");
+  const [merging, setMerging] = useState(false);
 
   const [tab, setTab] = useState<"stock" | "ledger">("stock");
   const [ledgerRows, setLedgerRows] = useState<InventoryLedgerRow[]>([]);
@@ -92,6 +98,33 @@ export function InventoryPage() {
         r.transaction_type.toLowerCase().includes(lower)
     );
   }, [ledgerRows, ledgerSearch]);
+
+  const uniqueItemNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const p of productStock) {
+      if (p.item) names.add(p.item);
+    }
+    return Array.from(names).sort();
+  }, [productStock]);
+
+  async function handleMerge() {
+    if (!sourceItem || !targetItem || sourceItem === targetItem) return;
+    setMerging(true);
+    setErr(null);
+    try {
+      await mergeInventoryItems({ sourceName: sourceItem, targetName: targetItem });
+      const [s, pStock] = await Promise.all([fetchDashboardSummary(), fetchProductStockBreakdown()]);
+      setSummary(s);
+      setProductStock(pStock);
+      setMergeDialogOpen(false);
+      setSourceItem("");
+      setTargetItem("");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Failed to merge items");
+    } finally {
+      setMerging(false);
+    }
+  }
 
   const negative = (summary?.current_stock_kgs ?? 0) < -0.0001;
 
@@ -166,6 +199,12 @@ export function InventoryPage() {
             }}
           >
             Set minimum stock (kg)
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => setMergeDialogOpen(true)}
+          >
+            Merge duplicate items
           </Button>
         </Stack>
       </Stack>
@@ -477,6 +516,59 @@ export function InventoryPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setLedgerOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={mergeDialogOpen} onClose={() => !merging && setMergeDialogOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Merge Duplicate Item Names</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            This will merge all records matching the Source Item Name into the Target Item Name. All existing transactions and products will point to the target item name.
+          </Typography>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Source Item Name (Duplicate)"
+              select
+              SelectProps={{ native: true }}
+              fullWidth
+              value={sourceItem}
+              onChange={(e) => setSourceItem(e.target.value)}
+            >
+              <option value=""></option>
+              {uniqueItemNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </TextField>
+            <TextField
+              label="Target Item Name (Correct)"
+              select
+              SelectProps={{ native: true }}
+              fullWidth
+              value={targetItem}
+              onChange={(e) => setTargetItem(e.target.value)}
+            >
+              <option value=""></option>
+              {uniqueItemNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </TextField>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMergeDialogOpen(false)} disabled={merging}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleMerge}
+            disabled={merging || !sourceItem || !targetItem || sourceItem === targetItem}
+          >
+            {merging ? "Merging..." : "Merge"}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

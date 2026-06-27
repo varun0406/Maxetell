@@ -311,7 +311,7 @@ export function OrdersPage() {
         <TextField
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search WO / client / invoice / OR…"
+          placeholder="Search WO / Client PO / client / invoice / OR…"
           size="small"
           fullWidth
           InputProps={{

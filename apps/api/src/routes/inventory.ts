@@ -161,4 +161,47 @@ export async function registerInventoryRoutes(app: FastifyInstance, opts: { db: 
     ledger.reverse();
     return { data: ledger };
   });
+
+  app.post("/inventory/merge-items", async (req) => {
+    const body = z.object({
+      sourceName: z.string().nonempty(),
+      targetName: z.string().nonempty(),
+    }).parse(req.body);
+
+    const sourceName = body.sourceName.trim();
+    const targetName = body.targetName.trim();
+
+    if (sourceName === targetName) {
+      return { success: true };
+    }
+
+    db.transaction(() => {
+      // 1. Update order_line_items directly
+      db.prepare(`UPDATE order_line_items SET item = ? WHERE item = ?`).run(targetName, sourceName);
+
+      // 2. Find all products with item = sourceName
+      const srcProducts = db.prepare(`SELECT * FROM products WHERE item = ?`).all(sourceName) as any[];
+
+      for (const srcProduct of srcProducts) {
+        // Find if target product exists with the same size and grade
+        const destProduct = db.prepare(`
+          SELECT * FROM products WHERE item = ? AND size = ? AND grade = ?
+        `).get(targetName, srcProduct.size, srcProduct.grade) as any;
+
+        if (destProduct) {
+          // Merge references: update foreign keys to point to destProduct.id
+          db.prepare(`UPDATE orders SET product_id = ? WHERE product_id = ?`).run(destProduct.id, srcProduct.id);
+          db.prepare(`UPDATE purchase_entries SET product_id = ? WHERE product_id = ?`).run(destProduct.id, srcProduct.id);
+          
+          // Delete duplicate source product
+          db.prepare(`DELETE FROM products WHERE id = ?`).run(srcProduct.id);
+        } else {
+          // Simply update the item name
+          db.prepare(`UPDATE products SET item = ? WHERE id = ?`).run(targetName, srcProduct.id);
+        }
+      }
+    })();
+
+    return { success: true };
+  });
 }

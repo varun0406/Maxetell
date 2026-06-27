@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Box, Button, Card, CardContent, IconButton, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardContent, IconButton, InputAdornment, Stack, TextField, Typography } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import SearchIcon from "@mui/icons-material/Search";
 import dayjs from "dayjs";
 import {
   createPurchaseReturn,
@@ -11,6 +12,7 @@ import {
   fetchPurchaseReturns,
   fetchSalesReturns,
   fetchOrders,
+  fetchProductStockBreakdown,
 } from "../lib/api";
 import type { PurchaseLedgerRow, PurchaseReturnRow, SalesReturnRow } from "../lib/api";
 import type { OrderRow } from "../lib/api";
@@ -27,9 +29,14 @@ export function ReturnsPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [pos, setPos] = useState<PurchaseLedgerRow[]>([]);
   const [salesReturns, setSalesReturns] = useState<SalesReturnRow[]>([]);
+  const [salesSearch, setSalesSearch] = useState("");
   const [purchaseReturns, setPurchaseReturns] = useState<PurchaseReturnRow[]>([]);
 
   const [salesOrderId, setSalesOrderId] = useState<number>(0);
+  const [salesReturnType, setSalesReturnType] = useState<"standard" | "old">("standard");
+  const [salesProductId, setSalesProductId] = useState<number>(0);
+  const [productList, setProductList] = useState<any[]>([]);
+
   const [salesDate, setSalesDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [salesWeight, setSalesWeight] = useState<number>(0);
   const [salesNote, setSalesNote] = useState("");
@@ -43,13 +50,14 @@ export function ReturnsPage() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([fetchOrders(), fetchPurchaseLedger(), fetchSalesReturns(), fetchPurchaseReturns()])
-      .then(([o, p, sr, pr]) => {
+    Promise.all([fetchOrders(), fetchPurchaseLedger(), fetchSalesReturns(), fetchPurchaseReturns(), fetchProductStockBreakdown()])
+      .then(([o, p, sr, pr, prod]) => {
         if (!alive) return;
         setOrders(o);
         setPos(p);
         setSalesReturns(sr);
         setPurchaseReturns(pr);
+        setProductList(prod);
       })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => {});
@@ -66,10 +74,23 @@ export function ReturnsPage() {
 
   const poChoices = useMemo(() => pos.slice().sort((a, b) => b.id - a.id), [pos]);
 
+  const filteredSalesReturns = useMemo(() => {
+    if (!salesSearch.trim()) return salesReturns;
+    const term = salesSearch.toLowerCase();
+    return salesReturns.filter((r) => 
+      (r.order_client_po_no && r.order_client_po_no.toLowerCase().includes(term)) ||
+      (r.order_wo_no && r.order_wo_no.toLowerCase().includes(term)) ||
+      (r.product_item && r.product_item.toLowerCase().includes(term)) ||
+      (r.note && r.note.toLowerCase().includes(term)) ||
+      (r.remarks && r.remarks.toLowerCase().includes(term))
+    );
+  }, [salesReturns, salesSearch]);
+
   async function refresh() {
-    const [sr, pr] = await Promise.all([fetchSalesReturns(), fetchPurchaseReturns()]);
+    const [sr, pr, prod] = await Promise.all([fetchSalesReturns(), fetchPurchaseReturns(), fetchProductStockBreakdown()]);
     setSalesReturns(sr);
     setPurchaseReturns(pr);
+    setProductList(prod);
   }
 
   return (
@@ -94,20 +115,53 @@ export function ReturnsPage() {
               <TextField
                 select
                 SelectProps={{ native: true }}
-                label="Order (WO)"
+                label="Return Type"
                 size="small"
-                value={salesOrderId || ""}
-                onChange={(e) => setSalesOrderId(Number(e.target.value))}
+                value={salesReturnType}
+                onChange={(e) => setSalesReturnType(e.target.value as "standard" | "old")}
               >
-                <option value="" disabled>
-                  Select WO…
-                </option>
-                {orderChoices.map((o) => (
-                  <option key={o.order_id} value={o.order_id}>
-                    {o.wo_no} {o.client_po_no ? `(PO: ${o.client_po_no})` : ""} — {o.client_name}
-                  </option>
-                ))}
+                <option value="standard">Standard Return (Linked to WO)</option>
+                <option value="old">Old Return (No linked Sales record)</option>
               </TextField>
+
+              {salesReturnType === "standard" ? (
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  label="Order (WO)"
+                  size="small"
+                  value={salesOrderId || ""}
+                  onChange={(e) => setSalesOrderId(Number(e.target.value))}
+                >
+                  <option value="" disabled>
+                    Select WO…
+                  </option>
+                  {orderChoices.map((o) => (
+                    <option key={o.order_id} value={o.order_id}>
+                      {o.wo_no} {o.client_po_no ? `(PO: ${o.client_po_no})` : ""} — {o.client_name}
+                    </option>
+                  ))}
+                </TextField>
+              ) : (
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  label="Item to Return"
+                  size="small"
+                  value={salesProductId || ""}
+                  onChange={(e) => setSalesProductId(Number(e.target.value))}
+                >
+                  <option value="" disabled>
+                    Select Product…
+                  </option>
+                  {productList.map((p) => (
+                    <option key={p.product_id} value={p.product_id}>
+                      {p.item} {p.size} {p.grade} (Stock: {Math.round(p.current_stock)} kg)
+                    </option>
+                  ))}
+                </TextField>
+              )}
+
               <TextField
                 label="Return date"
                 size="small"
@@ -120,20 +174,21 @@ export function ReturnsPage() {
                 label="Weight (kg)"
                 size="small"
                 type="number"
-                value={salesWeight}
+                value={salesWeight || ""}
                 onChange={(e) => setSalesWeight(Number(e.target.value))}
               />
               <TextField label="Note" size="small" value={salesNote} onChange={(e) => setSalesNote(e.target.value)} />
               <TextField label="Remarks" size="small" value={salesRemarks} onChange={(e) => setSalesRemarks(e.target.value)} />
               <Button
                 variant="contained"
-                disabled={saving || !salesOrderId || salesWeight <= 0}
+                disabled={saving || salesWeight <= 0 || (salesReturnType === "standard" ? !salesOrderId : !salesProductId)}
                 onClick={async () => {
                   setSaving(true);
                   setErr(null);
                   try {
                     await createSalesReturn({
-                      order_id: salesOrderId,
+                      order_id: salesReturnType === "standard" ? salesOrderId : null,
+                      product_id: salesReturnType === "old" ? salesProductId : null,
                       return_date: salesDate,
                       weight: salesWeight,
                       note: salesNote.trim() || undefined,
@@ -235,23 +290,38 @@ export function ReturnsPage() {
               <Typography fontWeight={900}>
                 Sales returns history
               </Typography>
-              <Button variant="outlined" size="small" onClick={() => exportToCsv("sales_returns", salesReturns)}>
+              <Button variant="outlined" size="small" onClick={() => exportToCsv("sales_returns", filteredSalesReturns)}>
                 Export
               </Button>
             </Stack>
-            {salesReturns.length === 0 ? (
+            <TextField
+              value={salesSearch}
+              onChange={(e) => setSalesSearch(e.target.value)}
+              placeholder="Search Client PO / WO / Item…"
+              size="small"
+              fullWidth
+              sx={{ mb: 1.5 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            {filteredSalesReturns.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 No sales returns yet.
               </Typography>
             ) : (
               <Stack spacing={1}>
-                {salesReturns.map((r) => (
+                {filteredSalesReturns.map((r) => (
                   <Box
                     key={r.id}
                     sx={{ border: "1px solid rgba(15,23,42,0.1)", borderRadius: 1, p: 1, display: "flex", justifyContent: "space-between" }}
                   >
                     <Box>
-                      <b>{r.return_date}</b> — {money(r.weight)} kg — order #{r.order_id}
+                      <b>{r.return_date}</b> — {money(r.weight)} kg — {r.order_id ? `WO: ${r.order_wo_no || `order #${r.order_id}`}` : `Old Return (${r.product_item} ${r.product_size} ${r.product_grade})`}
                       {r.note ? (
                         <Typography variant="caption" display="block" color="text.secondary">
                           Note: {r.note}

@@ -158,7 +158,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
   db.exec(`
 CREATE TABLE IF NOT EXISTS sales_returns (
   id INTEGER PRIMARY KEY,
-  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+  product_id INTEGER REFERENCES products(id),
   return_date TEXT NOT NULL,
   weight REAL NOT NULL CHECK(weight > 0),
   note TEXT,
@@ -194,6 +195,30 @@ CREATE TABLE IF NOT EXISTS job_work_outward (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
+  migrateSalesReturns(db);
+}
+
+function migrateSalesReturns(db: Db) {
+  if (!columnExists(db, "sales_returns", "product_id")) {
+    db.exec(`ALTER TABLE sales_returns RENAME TO sales_returns_old`);
+    db.exec(`
+      CREATE TABLE sales_returns (
+        id INTEGER PRIMARY KEY,
+        order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products(id),
+        return_date TEXT NOT NULL,
+        weight REAL NOT NULL CHECK(weight > 0),
+        note TEXT,
+        remarks TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+    db.exec(`
+      INSERT INTO sales_returns (id, order_id, product_id, return_date, weight, note, remarks, created_at)
+      SELECT id, order_id, NULL, return_date, weight, note, remarks, created_at FROM sales_returns_old
+    `);
+    db.exec(`DROP TABLE sales_returns_old`);
+  }
 }
 
 function migrateOrderLines(db: Db) {

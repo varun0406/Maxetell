@@ -4,7 +4,8 @@ import type { Db } from "../db.js";
 import { recalcReceived } from "./purchase.js";
 
 const CreateSalesReturn = z.object({
-  order_id: z.coerce.number().int().positive(),
+  order_id: z.coerce.number().int().positive().nullable().optional(),
+  product_id: z.coerce.number().int().positive().nullable().optional(),
   return_date: z.string().min(10),
   weight: z.coerce.number().positive(),
   note: z.string().trim().optional(),
@@ -79,9 +80,24 @@ export async function registerReturnsRoutes(app: FastifyInstance, opts: { db: Db
   app.get("/returns/sales", async () => {
     const rows = db
       .prepare(
-        `SELECT id, order_id, return_date, weight, note, remarks, created_at
-         FROM sales_returns
-         ORDER BY return_date DESC, id DESC
+        `SELECT 
+          sr.id,
+          sr.order_id,
+          sr.product_id,
+          sr.return_date,
+          sr.weight,
+          sr.note,
+          sr.remarks,
+          sr.created_at,
+          o.wo_no AS order_wo_no,
+          o.client_po_no AS order_client_po_no,
+          p.item AS product_item,
+          p.size AS product_size,
+          p.grade AS product_grade
+         FROM sales_returns sr
+         LEFT JOIN orders o ON o.id = sr.order_id
+         LEFT JOIN products p ON p.id = COALESCE(sr.product_id, o.product_id)
+         ORDER BY sr.return_date DESC, sr.id DESC
          LIMIT 500`,
       )
       .all();
@@ -90,18 +106,30 @@ export async function registerReturnsRoutes(app: FastifyInstance, opts: { db: Db
 
   app.post("/returns/sales", async (req, reply) => {
     const body = CreateSalesReturn.parse(req.body);
-    const order = db.prepare(`SELECT id FROM orders WHERE id = ?`).get(body.order_id);
-    if (!order) return reply.code(404).send({ error: "Order not found" });
+    if (body.order_id) {
+      const order = db.prepare(`SELECT id FROM orders WHERE id = ?`).get(body.order_id);
+      if (!order) return reply.code(404).send({ error: "Order not found" });
 
-    const dispatchTotal = orderDispatchTotal(db, body.order_id);
-    const alreadyReturned = orderSalesReturnTotal(db, body.order_id);
-    if (alreadyReturned + body.weight > dispatchTotal + 0.0001) {
-      return reply.code(400).send({ error: "Sales return total cannot exceed dispatched total" });
+      const dispatchTotal = orderDispatchTotal(db, body.order_id);
+      const alreadyReturned = orderSalesReturnTotal(db, body.order_id);
+      if (alreadyReturned + body.weight > dispatchTotal + 0.0001) {
+        return reply.code(400).send({ error: "Sales return total cannot exceed dispatched total" });
+      }
+
+      db.prepare(
+        `INSERT INTO sales_returns(order_id, product_id, return_date, weight, note, remarks) VALUES (?,?,?,?,?,?)`,
+      ).run(body.order_id, null, body.return_date, body.weight, body.note ?? null, body.remarks ?? null);
+    } else {
+      if (!body.product_id) {
+        return reply.code(400).send({ error: "Either order_id or product_id must be provided" });
+      }
+      const prod = db.prepare(`SELECT id FROM products WHERE id = ?`).get(body.product_id);
+      if (!prod) return reply.code(404).send({ error: "Product not found" });
+
+      db.prepare(
+        `INSERT INTO sales_returns(order_id, product_id, return_date, weight, note, remarks) VALUES (?,?,?,?,?,?)`,
+      ).run(null, body.product_id, body.return_date, body.weight, body.note ?? null, body.remarks ?? null);
     }
-
-    db.prepare(
-      `INSERT INTO sales_returns(order_id, return_date, weight, note, remarks) VALUES (?,?,?,?,?)`,
-    ).run(body.order_id, body.return_date, body.weight, body.note ?? null, body.remarks ?? null);
     return { data: { success: true } };
   });
 
@@ -113,14 +141,16 @@ export async function registerReturnsRoutes(app: FastifyInstance, opts: { db: Db
 
     const existing = db
       .prepare(`SELECT id, order_id, weight FROM sales_returns WHERE id = ?`)
-      .get(id) as { id: number; order_id: number; weight: number } | undefined;
+      .get(id) as { id: number; order_id: number | null; weight: number } | undefined;
     if (!existing) return reply.code(404).send({ error: "Not found" });
 
-    const nextWeight = body.weight ?? existing.weight;
-    const dispatchTotal = orderDispatchTotal(db, existing.order_id);
-    const alreadyOther = orderSalesReturnTotal(db, existing.order_id, id);
-    if (alreadyOther + nextWeight > dispatchTotal + 0.0001) {
-      return reply.code(400).send({ error: "Sales return total cannot exceed dispatched total" });
+    if (existing.order_id) {
+      const nextWeight = body.weight ?? existing.weight;
+      const dispatchTotal = orderDispatchTotal(db, existing.order_id);
+      const alreadyOther = orderSalesReturnTotal(db, existing.order_id, id);
+      if (alreadyOther + nextWeight > dispatchTotal + 0.0001) {
+        return reply.code(400).send({ error: "Sales return total cannot exceed dispatched total" });
+      }
     }
 
     const fields: string[] = [];

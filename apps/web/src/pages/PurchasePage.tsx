@@ -10,6 +10,7 @@ import {
   Drawer,
   FormControlLabel,
   IconButton,
+  InputAdornment,
   Stack,
   Switch,
   Tab,
@@ -21,6 +22,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
+import SearchIcon from "@mui/icons-material/Search";
 import dayjs from "dayjs";
 import {
   createPurchaseBatch,
@@ -49,6 +51,7 @@ export function PurchasePage() {
   const [products, setProducts] = useState<MasterProduct[]>([]);
 
   const [rows, setRows] = useState<PurchaseLedgerRow[]>([]);
+  const [q, setQ] = useState("");
   const [hideCompleted, setHideCompleted] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,9 +101,21 @@ export function PurchasePage() {
   }
 
   const shownRows = useMemo(() => {
-    if (!hideCompleted) return rows;
-    return rows.filter((r) => r.balance_weight > 0.01);
-  }, [rows, hideCompleted]);
+    let list = rows;
+    if (hideCompleted) {
+      list = list.filter((r) => r.balance_weight > 0.01);
+    }
+    if (q.trim()) {
+      const searchVal = q.toLowerCase();
+      list = list.filter((r) => 
+        (r.client_po_no && r.client_po_no.toLowerCase().includes(searchVal)) ||
+        (r.po_no && r.po_no.toLowerCase().includes(searchVal)) ||
+        (r.supplier_name && r.supplier_name.toLowerCase().includes(searchVal)) ||
+        (r.item && r.item.toLowerCase().includes(searchVal))
+      );
+    }
+    return list;
+  }, [rows, hideCompleted, q]);
 
   const loadLedger = useCallback(() => {
     setLoading(true);
@@ -548,13 +563,29 @@ export function PurchasePage() {
 
       <Card>
         <CardContent>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }} justifyContent="space-between" sx={{ mb: 1.5 }}>
             <Typography fontWeight={800}>Purchase orders ledger</Typography>
-            <FormControlLabel
-              sx={{ whiteSpace: "nowrap", ml: 1 }}
-              control={<Switch checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} />}
-              label="Hide completed"
-            />
+            <Stack direction="row" spacing={2} alignItems="center" sx={{ flexGrow: { xs: 1, sm: 0 }, minWidth: { sm: 350 } }}>
+              <TextField
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search Client PO / PO / Supplier…"
+                size="small"
+                fullWidth
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <FormControlLabel
+                sx={{ whiteSpace: "nowrap" }}
+                control={<Switch checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} />}
+                label="Hide completed"
+              />
+            </Stack>
           </Stack>
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
             Click a row to see receipt lines. Columns match PO / WEIGHT / rec wt. / bal / RATE / amounts / supplier.
