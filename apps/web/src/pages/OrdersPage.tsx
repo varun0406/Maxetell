@@ -33,8 +33,9 @@ import {
   patchOrderMeta,
   patchOrderLine,
   deleteOrder,
+  splitImportOrders,
 } from "../lib/api";
-import type { MasterProduct, OrderRow } from "../lib/api";
+import type { MasterProduct, OrderRow, SplitImportRow } from "../lib/api";
 import type { DispatchEntry, PaymentEntry } from "../lib/api";
 import { exportToCsv } from "../lib/export";
 
@@ -82,6 +83,7 @@ function statusChip(status: OrderRow["payment_status"]) {
 export function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [products, setProducts] = useState<MasterProduct[]>([]);
   const [q, setQ] = useState("");
@@ -260,6 +262,138 @@ export function OrdersPage() {
     }
   }
 
+  async function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setErr(null);
+    setSuccessMsg(null);
+    setSaving(true);
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        if (!text) {
+          throw new Error("File is empty.");
+        }
+
+        const parsed = parseCSV(text);
+        if (parsed.length === 0) {
+          throw new Error("No rows found in CSV.");
+        }
+
+        const payload: SplitImportRow[] = parsed
+          .map((row) => {
+            return {
+              id: Number(row.id) || 0,
+              code: Number(row.code) || 0,
+              order_id: Number(row.order_id) || 0,
+              size: row.size || "",
+              item: row.item || "",
+              grade: row.grade || "",
+              length_nos: row.length_nos || null,
+              order_kgs: Number(row.order_kgs) || 0,
+              order_pcs: Number(row.order_pcs) || 0,
+              bill_rate: Number(row.bill_rate) || 0,
+              avg_cost: row.avg_cost ? Number(row.avg_cost) : undefined,
+            };
+          })
+          .filter((r) => r.id > 0 && r.order_id > 0 && r.size && r.item && r.grade);
+
+        if (payload.length === 0) {
+          throw new Error("Could not find any valid rows with 'id', 'order_id', 'size', 'item', 'grade' fields.");
+        }
+
+        const res = await splitImportOrders(payload);
+        setSuccessMsg(`Successfully processed split configurations! Affected orders count: ${res.affectedOrdersCount}`);
+        
+        // Refresh orders list
+        const updatedOrders = await fetchOrders({ q: q.trim() || undefined });
+        setRows(updatedOrders);
+      } catch (err: any) {
+        setErr(err.message || "Failed to process CSV file.");
+      } finally {
+        setSaving(false);
+        e.target.value = "";
+      }
+    };
+
+    reader.onerror = () => {
+      setErr("Failed to read file.");
+      setSaving(false);
+    };
+
+    reader.readAsText(file);
+  }
+
+  function parseCSV(text: string): Record<string, string>[] {
+    const lines: string[][] = [];
+    let row: string[] = [];
+    let cell = "";
+    let inQuotes = false;
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+      
+      if (inQuotes) {
+        if (char === '"') {
+          if (nextChar === '"') {
+            cell += '"';
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          cell += char;
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true;
+        } else if (char === ',') {
+          row.push(cell.trim());
+          cell = "";
+        } else if (char === '\r' || char === '\n') {
+          row.push(cell.trim());
+          cell = "";
+          if (row.some(c => c !== "")) {
+            lines.push(row);
+          }
+          row = [];
+          if (char === '\r' && nextChar === '\n') {
+            i++;
+          }
+        } else {
+          cell += char;
+        }
+      }
+    }
+    
+    if (cell || row.length > 0) {
+      row.push(cell.trim());
+      if (row.some(c => c !== "")) {
+        lines.push(row);
+      }
+    }
+    
+    if (lines.length === 0) return [];
+    
+    const headers = lines[0].map(h => h.toLowerCase().trim());
+    const results: Record<string, string>[] = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i];
+      const obj: Record<string, string> = {};
+      for (let j = 0; j < headers.length; j++) {
+        obj[headers[j]] = values[j] !== undefined ? values[j].trim() : "";
+      }
+      results.push(obj);
+    }
+    
+    return results;
+  }
+
   async function addPayment() {
     if (!selected) return;
     setSaving(true);
@@ -298,6 +432,18 @@ export function OrdersPage() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
+          <Button
+            variant="outlined"
+            component="label"
+          >
+            Import Split (CSV)
+            <input
+              type="file"
+              accept=".csv"
+              hidden
+              onChange={handleCsvUpload}
+            />
+          </Button>
           <Button variant="outlined" onClick={() => exportToCsv("orders", rows)}>
             Export to Excel
           </Button>
@@ -369,6 +515,12 @@ export function OrdersPage() {
       {err ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {err}
+        </Alert>
+      ) : null}
+
+      {successMsg ? (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {successMsg}
         </Alert>
       ) : null}
 

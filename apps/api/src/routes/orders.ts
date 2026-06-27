@@ -57,6 +57,21 @@ const CreateOrderBody = z.object({
   lines: z.array(OrderLine).min(1),
 });
 
+const SplitImportItem = z.object({
+  id: z.coerce.number().int(),
+  code: z.coerce.number().int(),
+  order_id: z.coerce.number().int(),
+  size: z.string().trim().min(1),
+  item: z.string().trim().min(1),
+  grade: z.string().trim().min(1),
+  length_nos: z.string().trim().optional().nullable(),
+  order_kgs: z.coerce.number().min(0),
+  order_pcs: z.coerce.number().int().min(0).default(0),
+  bill_rate: z.coerce.number().min(0).default(0),
+  avg_cost: z.coerce.number().min(0).optional(),
+});
+const SplitImportBody = z.array(SplitImportItem);
+
 function resolveProductId(db: Db, size: string, item: string, grade: string) {
   const existing = db
     .prepare(`SELECT id FROM products WHERE size = ? AND item = ? AND grade = ?`)
@@ -364,5 +379,92 @@ export async function registerOrdersRoutes(app: FastifyInstance, opts: { db: Db 
     db.prepare(`DELETE FROM orders WHERE id = ?`).run(orderId);
 
     return { data: { success: true } };
+  });
+
+  app.post("/orders/split-import", async (req, reply) => {
+    const body = SplitImportBody.parse(req.body);
+    if (body.length === 0) return reply.code(400).send({ error: "No import rows provided" });
+
+    const groups: Record<number, typeof body> = {};
+    for (const item of body) {
+      if (!groups[item.id]) {
+        groups[item.id] = [];
+      }
+      groups[item.id].push(item);
+    }
+
+    const affectedOrderIds = new Set<number>();
+
+    try {
+      db.transaction(() => {
+        for (const [idStr, groupRows] of Object.entries(groups)) {
+          const originalId = Number(idStr);
+          const originalItem = db.prepare(`SELECT * FROM order_line_items WHERE id = ?`).get(originalId) as {
+            id: number;
+            order_id: number;
+            size: string;
+            item: string;
+            grade: string;
+            order_kgs: number;
+            order_pcs: number;
+            bill_rate: number;
+            avg_cost: number;
+          } | undefined;
+
+          if (!originalItem) {
+            throw new Error(`Original line item with ID ${originalId} not found in database.`);
+          }
+
+          affectedOrderIds.add(originalItem.order_id);
+
+          const newRows = groupRows.filter(r => r.code > 0);
+          const totalNewKgs = newRows.reduce((sum, r) => sum + (Number(r.order_kgs) || 0), 0);
+          const totalNewPcs = newRows.reduce((sum, r) => sum + (Number(r.order_pcs) || 0), 0);
+
+          const originalKgs = originalItem.order_kgs;
+          const originalPcs = originalItem.order_pcs || 0;
+
+          let updatedKgs = 0;
+          let updatedPcs = 0;
+
+          if (totalNewKgs < originalKgs) {
+            updatedKgs = originalKgs - totalNewKgs;
+            updatedPcs = Math.max(0, originalPcs - totalNewPcs);
+          }
+
+          // Update original row (which holds CODE = 0)
+          db.prepare(`UPDATE order_line_items SET order_kgs = ?, order_pcs = ? WHERE id = ?`)
+            .run(updatedKgs, updatedPcs, originalId);
+
+          // Insert new rows
+          const insLine = db.prepare(
+            `INSERT INTO order_line_items(order_id, size, item, grade, length_nos, order_kgs, order_pcs, bill_rate, avg_cost)
+             VALUES (?,?,?,?,?,?,?,?,?)`
+          );
+          for (const nr of newRows) {
+            const autoAvg = avgCostFromPurchases(db, resolveProductId(db, nr.size, nr.item, nr.grade));
+            insLine.run(
+              originalItem.order_id,
+              nr.size,
+              nr.item,
+              nr.grade,
+              nr.length_nos ?? null,
+              nr.order_kgs,
+              nr.order_pcs,
+              nr.bill_rate || originalItem.bill_rate,
+              nr.avg_cost !== undefined ? nr.avg_cost : (originalItem.avg_cost || autoAvg)
+            );
+          }
+        }
+
+        for (const orderId of affectedOrderIds) {
+          recomputeOrderHeaderFromLines(db, orderId);
+        }
+      })();
+    } catch (e: any) {
+      return reply.code(400).send({ error: e.message });
+    }
+
+    return { success: true, affectedOrdersCount: affectedOrderIds.size };
   });
 }

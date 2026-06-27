@@ -123,6 +123,25 @@ export type CreateOrderLine = {
   bill_rate: number;
 };
 
+export type SplitImportRow = {
+  id: number;
+  code: number;
+  order_id: number;
+  size: string;
+  item: string;
+  grade: string;
+  length_nos?: string | null;
+  order_kgs: number;
+  order_pcs: number;
+  bill_rate: number;
+  avg_cost?: number;
+};
+
+export async function splitImportOrders(rows: SplitImportRow[]) {
+  const res = await api.post<{ success: boolean; affectedOrdersCount: number }>("/orders/split-import", rows);
+  return res.data;
+}
+
 export async function createOrder(body: {
   wo_no: string;
   client_po_no?: string | null;
