@@ -112,7 +112,8 @@ FROM order_line_items oli
         SUM(sales_return_weight) as sales_return_weight,
         SUM(purchase_return_weight) as purchase_return_weight
       FROM (
-        SELECT strftime('%Y-%m', dispatch_date) as month, dispatch_weight as sales_weight, (dispatch_weight * COALESCE(sales_rate, 0)) as sales_amount, 0 as purchase_weight, 0 as purchase_amount, 0 as sales_return_weight, 0 as purchase_return_weight FROM dispatch_entries
+        SELECT strftime('%Y-%m', de.dispatch_date) as month, de.dispatch_weight as sales_weight, (de.dispatch_weight * COALESCE(NULLIF(de.sales_rate, 0), NULLIF(oli.bill_rate, 0), o.bill_rate, 0)) as sales_amount, 0 as purchase_weight, 0 as purchase_amount, 0 as sales_return_weight, 0 as purchase_return_weight 
+          FROM dispatch_entries de LEFT JOIN order_line_items oli ON de.order_line_item_id = oli.id LEFT JOIN orders o ON de.order_id = o.id
         UNION ALL
         SELECT strftime('%Y-%m', pr.receipt_date) as month, 0, 0, pr.weight_received, pr.weight_received * COALESCE(pe.rate, 0), 0, 0 
           FROM purchase_receipts pr JOIN purchase_entries pe ON pr.purchase_entry_id = pe.id
@@ -130,11 +131,13 @@ FROM order_line_items oli
     // Quarterly sales price
     const quarterlySales = db.prepare(`
       SELECT 
-        strftime('%Y', dispatch_date) || '-Q' || ((cast(strftime('%m', dispatch_date) as integer) + 2) / 3) as quarter,
-        SUM(dispatch_weight) as sales_weight,
-        SUM(dispatch_weight * COALESCE(sales_rate, 0)) as sales_amount
-      FROM dispatch_entries
-      WHERE dispatch_date IS NOT NULL
+        strftime('%Y', de.dispatch_date) || '-Q' || ((cast(strftime('%m', de.dispatch_date) as integer) + 2) / 3) as quarter,
+        SUM(de.dispatch_weight) as sales_weight,
+        SUM(de.dispatch_weight * COALESCE(NULLIF(de.sales_rate, 0), NULLIF(oli.bill_rate, 0), o.bill_rate, 0)) as sales_amount
+      FROM dispatch_entries de
+      LEFT JOIN order_line_items oli ON de.order_line_item_id = oli.id
+      LEFT JOIN orders o ON de.order_id = o.id
+      WHERE de.dispatch_date IS NOT NULL
       GROUP BY quarter
       ORDER BY quarter DESC
       LIMIT 8
