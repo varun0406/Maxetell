@@ -16,6 +16,20 @@ const CreateOutwardBody = z.object({
   process_loss: z.coerce.number().min(0).default(0),
 });
 
+const CreateOutSentBody = z.object({
+  challan_date: z.string().nonempty(),
+  description: z.string().nonempty(),
+  qty: z.coerce.number().min(0),
+  short_qty: z.coerce.number().min(0).default(0),
+});
+
+const CreateOutReceiptBody = z.object({
+  sent_id: z.coerce.number().int().positive(),
+  receipt_date: z.string().nonempty(),
+  receipt_qty: z.coerce.number().min(0),
+  process_loss: z.coerce.number().min(0).default(0),
+});
+
 export async function registerJobWorkRoutes(app: FastifyInstance, opts: { db: Db }) {
   const { db } = opts;
 
@@ -90,6 +104,80 @@ export async function registerJobWorkRoutes(app: FastifyInstance, opts: { db: Db
   app.delete<{ Params: { id: string } }>("/jobwork/outward/:id", async (req) => {
     const id = Number(req.params.id);
     db.prepare(`DELETE FROM job_work_outward WHERE id = ?`).run(id);
+    return { success: true };
+  });
+
+  // Job Work Out endpoints
+  app.get("/jobwork-out", async () => {
+    const sent = db.prepare(`SELECT * FROM job_work_out_sent ORDER BY challan_date DESC, id DESC`).all() as any[];
+    const received = db.prepare(`SELECT * FROM job_work_out_receipt ORDER BY receipt_date ASC, id ASC`).all() as any[];
+
+    const receiptMap = new Map<number, any[]>();
+    for (const rec of received) {
+      const list = receiptMap.get(rec.sent_id) || [];
+      list.push(rec);
+      receiptMap.set(rec.sent_id, list);
+    }
+
+    const data = sent.map((s) => {
+      const receipts = receiptMap.get(s.id) || [];
+      const totalReceived = receipts.reduce((sum, r) => sum + r.receipt_qty, 0);
+      const totalLoss = receipts.reduce((sum, r) => sum + r.process_loss, 0);
+      const finalQty = s.qty - (s.short_qty || 0);
+      const balance = finalQty - totalReceived - totalLoss;
+
+      return {
+        ...s,
+        final_qty: finalQty,
+        receipts,
+        total_received: totalReceived,
+        total_loss: totalLoss,
+        balance,
+      };
+    });
+
+    return { data };
+  });
+
+  app.post("/jobwork-out/sent", async (req) => {
+    const body = CreateOutSentBody.parse(req.body);
+    const stmt = db.prepare(`
+      INSERT INTO job_work_out_sent (challan_date, description, qty, short_qty)
+      VALUES (@challan_date, @description, @qty, @short_qty)
+    `);
+    const info = stmt.run({
+      challan_date: body.challan_date,
+      description: body.description,
+      qty: body.qty,
+      short_qty: body.short_qty,
+    });
+    return { data: { id: Number(info.lastInsertRowid) } };
+  });
+
+  app.post("/jobwork-out/receipt", async (req) => {
+    const body = CreateOutReceiptBody.parse(req.body);
+    const stmt = db.prepare(`
+      INSERT INTO job_work_out_receipt (sent_id, receipt_date, receipt_qty, process_loss)
+      VALUES (@sent_id, @receipt_date, @receipt_qty, @process_loss)
+    `);
+    const info = stmt.run({
+      sent_id: body.sent_id,
+      receipt_date: body.receipt_date,
+      receipt_qty: body.receipt_qty,
+      process_loss: body.process_loss,
+    });
+    return { data: { id: Number(info.lastInsertRowid) } };
+  });
+
+  app.delete<{ Params: { id: string } }>("/jobwork-out/sent/:id", async (req) => {
+    const id = Number(req.params.id);
+    db.prepare(`DELETE FROM job_work_out_sent WHERE id = ?`).run(id);
+    return { success: true };
+  });
+
+  app.delete<{ Params: { id: string } }>("/jobwork-out/receipt/:id", async (req) => {
+    const id = Number(req.params.id);
+    db.prepare(`DELETE FROM job_work_out_receipt WHERE id = ?`).run(id);
     return { success: true };
   });
 }

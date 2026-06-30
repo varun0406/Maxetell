@@ -13,6 +13,8 @@ import {
   Stack,
   TextField,
   Typography,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import { 
   fetchDashboardSummary, 
@@ -54,6 +56,25 @@ export function InventoryPage() {
   const [ledgerData, setLedgerData] = useState<ProductLedgerRow[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [selectedProductStr, setSelectedProductStr] = useState("");
+
+  const [stockSearch, setStockSearch] = useState("");
+  const [hideEmptyStock, setHideEmptyStock] = useState(false);
+
+  const filteredProductStock = useMemo(() => {
+    let list = productStock || [];
+    if (hideEmptyStock) {
+      list = list.filter(p => Math.abs(p.current_stock) > 0.0001);
+    }
+    if (stockSearch) {
+      const lower = stockSearch.toLowerCase();
+      list = list.filter(p => 
+        p.item.toLowerCase().includes(lower) || 
+        p.size.toLowerCase().includes(lower) || 
+        p.grade.toLowerCase().includes(lower)
+      );
+    }
+    return list;
+  }, [productStock, stockSearch, hideEmptyStock]);
 
   useEffect(() => {
     let alive = true;
@@ -266,11 +287,38 @@ export function InventoryPage() {
 
           <Card>
             <CardContent>
-              <Typography fontWeight={900} sx={{ mb: 2 }}>
-                Product Breakdown
-              </Typography>
-              {productStock.length === 0 ? (
-                <Typography color="text.secondary">No stock data available yet.</Typography>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" gap={1}>
+                <Typography fontWeight={900} variant="h6">
+                  Product Breakdown
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => exportToCsv("product_stock", productStock)}
+                  disabled={productStock.length === 0}
+                >
+                  Export Stock
+                </Button>
+              </Stack>
+              
+              <Stack direction="row" spacing={2} sx={{ mb: 2, alignItems: 'center' }}>
+                <TextField
+                  label="Search Products"
+                  placeholder="Search by item, size, grade..."
+                  value={stockSearch}
+                  onChange={(e) => setStockSearch(e.target.value)}
+                  size="small"
+                  fullWidth
+                />
+                <FormControlLabel
+                  control={<Switch size="small" checked={hideEmptyStock} onChange={(e) => setHideEmptyStock(e.target.checked)} />}
+                  label="Hide Empty"
+                  sx={{ whiteSpace: 'nowrap' }}
+                />
+              </Stack>
+
+              {filteredProductStock.length === 0 ? (
+                <Typography color="text.secondary">No stock data matching filters.</Typography>
               ) : (
                 <Box sx={{ overflowX: "auto" }}>
                   <Box sx={{ minWidth: 900 }}>
@@ -284,7 +332,7 @@ export function InventoryPage() {
                       <Box>Actual Avg Price</Box>
                       <Box>Action</Box>
                     </Box>
-                    {productStock.map((p) => {
+                    {filteredProductStock.map((p) => {
                       const isNegative = p.current_stock < -0.0001;
                       return (
                         <Box key={p.product_id} sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr 150px 150px", p: 2, borderBottom: "1px solid rgba(0,0,0,0.05)", alignItems: "center" }}>

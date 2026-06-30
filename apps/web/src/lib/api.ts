@@ -656,3 +656,49 @@ export async function mergeInventoryItems(body: { sourceName: string; targetName
   return res.data;
 }
 
+export type JobWorkOutReceipt = {
+  id: number;
+  sent_id: number;
+  receipt_date: string;
+  receipt_qty: number;
+  process_loss: number;
+  created_at: string;
+};
+
+export type JobWorkOutSent = {
+  id: number;
+  challan_date: string;
+  description: string;
+  qty: number;
+  short_qty: number;
+  created_at: string;
+  final_qty: number;
+  receipts: JobWorkOutReceipt[];
+  total_received: number;
+  total_loss: number;
+  balance: number;
+};
+
+export async function fetchJobWorkOutList() {
+  const res = await api.get<{ data: JobWorkOutSent[] }>("/jobwork-out");
+  return res.data.data;
+}
+
+export async function createJobWorkOutSent(body: { challan_date: string; description: string; qty: number; short_qty?: number }) {
+  const res = await api.post<{ data: { id: number } }>("/jobwork-out/sent", body);
+  return res.data.data;
+}
+
+export async function createJobWorkOutReceipt(body: { sent_id: number; receipt_date: string; receipt_qty: number; process_loss?: number }) {
+  const res = await api.post<{ data: { id: number } }>("/jobwork-out/receipt", body);
+  return res.data.data;
+}
+
+export async function deleteJobWorkOutSent(id: number) {
+  await api.delete(`/jobwork-out/sent/${id}`);
+}
+
+export async function deleteJobWorkOutReceipt(id: number) {
+  await api.delete(`/jobwork-out/receipt/${id}`);
+}
+

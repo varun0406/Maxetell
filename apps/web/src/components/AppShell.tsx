@@ -38,6 +38,7 @@ const nav = [
   { to: "/payments", label: "Payments", icon: <PaymentsOutlinedIcon /> },
   { to: "/returns", label: "Returns", icon: <ReceiptLongOutlinedIcon /> },
   { to: "/jobwork", label: "Job Work", icon: <AssignmentOutlinedIcon /> },
+  { to: "/jobwork-out", label: "Job Work Out", icon: <AssignmentOutlinedIcon /> },
   { to: "/users", label: "Users", icon: <PersonAddOutlinedIcon /> },
 ];
 
