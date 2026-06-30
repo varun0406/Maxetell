@@ -143,11 +143,34 @@ FROM order_line_items oli
       LIMIT 8
     `).all() as any[];
 
+    const topClients = db.prepare(`
+      SELECT c.name, SUM(de.dispatch_weight) as total_weight, SUM(de.dispatch_weight * COALESCE(NULLIF(de.sales_rate, 0), NULLIF(oli.bill_rate, 0), o.bill_rate, 0)) as total_amount
+      FROM dispatch_entries de
+      LEFT JOIN order_line_items oli ON de.order_line_item_id = oli.id
+      JOIN orders o ON de.order_id = o.id
+      JOIN clients c ON o.client_id = c.id
+      GROUP BY c.id
+      ORDER BY total_weight DESC
+      LIMIT 5
+    `).all() as any[];
+
+    const topProducts = db.prepare(`
+      SELECT p.item || ' (' || p.size || ')' as name, SUM(de.dispatch_weight) as total_weight
+      FROM dispatch_entries de
+      JOIN orders o ON de.order_id = o.id
+      JOIN products p ON o.product_id = p.id
+      GROUP BY p.id
+      ORDER BY total_weight DESC
+      LIMIT 5
+    `).all() as any[];
+
     return {
       data: {
         avg_purchase_price: avgPurchasePrice,
         monthly_summary: monthlySummary,
-        quarterly_sales: quarterlySales
+        quarterly_sales: quarterlySales,
+        top_clients: topClients,
+        top_products: topProducts
       }
     };
   });

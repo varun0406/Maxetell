@@ -252,6 +252,8 @@ export type DashboardAnalytics = {
     sales_weight: number;
     sales_amount: number;
   }>;
+  top_clients: Array<{ name: string; total_weight: number; total_amount: number }>;
+  top_products: Array<{ name: string; total_weight: number }>;
 };
 
 export async function fetchDashboardAnalytics() {

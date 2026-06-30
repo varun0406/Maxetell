@@ -114,6 +114,42 @@ export function DashboardPage() {
           </Typography>
           <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" } }}>
             <KpiCard label="Average Purchase Price" value={`₹${money(analytics.avg_purchase_price)}`} sub="Weighted average across all purchases" />
+            <KpiCard label="Expected Profit" value={`₹${money(data?.profit_per_kg_positive_sum ?? 0)}`} sub="Sum of positive (Bill Rate - Avg Cost) * Kg" />
+            <KpiCard label="Expected Loss" value={`₹${money(data?.profit_per_kg_negative_sum ?? 0)}`} sub="Sum of negative (Bill Rate - Avg Cost) * Kg" />
+          </Box>
+
+          <Typography variant="h6" fontWeight={900} sx={{ mt: 4, mb: 2 }}>
+            Top 5 Clients & Products (by Dispatch Weight)
+          </Typography>
+          <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" } }}>
+            <Card>
+              <CardContent>
+                <Typography variant="subtitle2" color="text.secondary" fontWeight={700} sx={{ mb: 1 }}>Top 5 Clients</Typography>
+                {analytics.top_clients.map((c, i) => (
+                  <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(0,0,0,0.05)', py: 1 }}>
+                    <Typography variant="body2" fontWeight={700}>{c.name}</Typography>
+                    <Box textAlign="right">
+                      <Typography variant="body2">{money(c.total_weight)} kg</Typography>
+                      <Typography variant="caption" color="text.secondary">₹{money(c.total_amount)}</Typography>
+                    </Box>
+                  </Box>
+                ))}
+                {analytics.top_clients.length === 0 && <Typography variant="body2" color="text.secondary">No data</Typography>}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent>
+                <Typography variant="subtitle2" color="text.secondary" fontWeight={700} sx={{ mb: 1 }}>Top 5 Products</Typography>
+                {analytics.top_products.map((p, i) => (
+                  <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.05)', py: 1 }}>
+                    <Typography variant="body2" fontWeight={700}>{p.name}</Typography>
+                    <Typography variant="body2">{money(p.total_weight)} kg</Typography>
+                  </Box>
+                ))}
+                {analytics.top_products.length === 0 && <Typography variant="body2" color="text.secondary">No data</Typography>}
+              </CardContent>
+            </Card>
           </Box>
 
           <Typography variant="h6" fontWeight={900} sx={{ mt: 4, mb: 2 }}>
