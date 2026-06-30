@@ -97,7 +97,7 @@ FROM order_line_items oli
       SELECT SUM(pr.weight_received * pe.rate) / SUM(pr.weight_received) as avg 
       FROM purchase_receipts pr
       JOIN purchase_entries pe ON pr.purchase_entry_id = pe.id
-      WHERE pr.weight_received > 0
+      WHERE pr.weight_received > 0 AND pe.rate > 0
     `).get() as { avg: number | null };
     const avgPurchasePrice = avgPurchasePriceRow?.avg || 0;
 
@@ -187,7 +187,7 @@ FROM order_line_items oli
         COALESCE(pr.avg_price, 0) as actual_avg_price
       FROM products p
       LEFT JOIN (
-        SELECT pe.product_id, SUM(pr.weight_received) as receipts, SUM(pr.weight_received * pe.rate) / NULLIF(SUM(pr.weight_received), 0) as avg_price
+        SELECT pe.product_id, SUM(pr.weight_received) as receipts, SUM(CASE WHEN pe.rate > 0 THEN pr.weight_received * pe.rate ELSE 0 END) / NULLIF(SUM(CASE WHEN pe.rate > 0 THEN pr.weight_received ELSE 0 END), 0) as avg_price
         FROM purchase_receipts pr
         JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
         GROUP BY pe.product_id

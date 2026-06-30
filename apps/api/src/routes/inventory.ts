@@ -132,7 +132,7 @@ export async function registerInventoryRoutes(app: FastifyInstance, opts: { db: 
 
     // Get actual average prices
     const avgPricesRows = db.prepare(`
-      SELECT pe.product_id, SUM(pr.weight_received * pe.rate) / NULLIF(SUM(pr.weight_received), 0) as avg_price
+      SELECT pe.product_id, SUM(CASE WHEN pe.rate > 0 THEN pr.weight_received * pe.rate ELSE 0 END) / NULLIF(SUM(CASE WHEN pe.rate > 0 THEN pr.weight_received ELSE 0 END), 0) as avg_price
       FROM purchase_receipts pr
       JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
       GROUP BY pe.product_id

@@ -313,7 +313,7 @@ SELECT
     FROM purchase_receipts pr
     JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
     JOIN products prod ON prod.id = pe.product_id
-    WHERE prod.item = oli.item AND prod.size = oli.size AND prod.grade = oli.grade
+    WHERE prod.item = oli.item AND prod.size = oli.size AND prod.grade = oli.grade AND pe.rate > 0
   ), 0) AS actual_avg_price
 FROM order_line_items oli
 JOIN orders o ON o.id = oli.order_id

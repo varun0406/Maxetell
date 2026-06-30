@@ -17,7 +17,7 @@ function avgCostFromPurchases(db: Db, productId: number): number {
         (SELECT SUM(pr.weight_received * pe.rate) / NULLIF(SUM(pr.weight_received), 0)
          FROM purchase_receipts pr
          JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
-         WHERE pe.product_id = ?),
+         WHERE pe.product_id = ? AND pe.rate > 0),
         0
       ) AS avg_cost`,
     )
@@ -70,7 +70,7 @@ export async function registerMastersRoutes(app: FastifyInstance, opts: { db: Db
               SELECT SUM(pr.weight_received * pe.rate) / NULLIF(SUM(pr.weight_received), 0)
               FROM purchase_receipts pr
               JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
-              WHERE pe.product_id = p.id
+              WHERE pe.product_id = p.id AND pe.rate > 0
             ),
             0
           ) AS avg_cost
