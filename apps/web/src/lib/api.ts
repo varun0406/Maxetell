@@ -728,3 +728,16 @@ export async function deleteJobWorkOutSent(id: number) {
 export async function deleteJobWorkOutReceipt(id: number) {
   await api.delete(`/jobwork-out/receipt/${id}`);
 }
+
+export async function fetchSyncExport(month: string) {
+  const res = await api.get<{ orders: any[]; purchases: any[] }>(`/sync/export?month=${month}`);
+  return res.data;
+}
+
+export async function importSyncReturns(body: {
+  salesReturns: { order_id: number; return_date: string; weight: number; note?: string; remarks?: string }[];
+  purchaseReturns: { purchase_entry_id: number; return_date: string; weight: number; note?: string; remarks?: string }[];
+}) {
+  const res = await api.post("/sync/import", body);
+  return res.data;
+}

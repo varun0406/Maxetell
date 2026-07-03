@@ -150,21 +150,27 @@ export function OrdersPage() {
       .finally(() => setDrawerLoading(false));
   }, [selected?.order_id]);
 
+  const shownRows = useMemo(() => {
+    if (!hideCompleted) return rows;
+    return rows.filter((r) => r.balance_kgs > 0.0001 || (r.balance_pcs || 0) > 0);
+  }, [rows, hideCompleted]);
+
   const header = useMemo(() => {
-    const lineCount = rows.length;
-    const orderCount = new Set(rows.map((r) => r.order_id)).size;
-    const orderKgs = sum(rows.map((r) => r.order_kgs));
-    const orderPcs = sum(rows.map((r) => r.order_pcs || 0));
-    const pending = sum(rows.map((r) => Math.max(0, r.balance_kgs)));
-    const dispatchKgs = sum(rows.map((r) => r.dispatch_weight));
-    const dispatchPcsSum = sum(rows.map((r) => r.dispatch_pcs || 0));
-    const balanceKgs = sum(rows.map((r) => Math.max(0, r.balance_kgs)));
-    const balancePcs = sum(rows.map((r) => Math.max(0, r.balance_pcs || 0)));
-    const invoiceTotal = sumOncePerOrder(rows, (r) => r.invoice_total);
-    const paidTotal = sumOncePerOrder(rows, (r) => r.paid_amount);
-    const bakiTotal = sumOncePerOrder(rows, (r) => r.baki_amount);
+    const sourceRows = shownRows;
+    const lineCount = sourceRows.length;
+    const orderCount = new Set(sourceRows.map((r) => r.order_id)).size;
+    const orderKgs = sum(sourceRows.map((r) => r.order_kgs));
+    const orderPcs = sum(sourceRows.map((r) => r.order_pcs || 0));
+    const pending = sum(sourceRows.map((r) => Math.max(0, r.balance_kgs)));
+    const dispatchKgs = sum(sourceRows.map((r) => r.dispatch_weight));
+    const dispatchPcsSum = sum(sourceRows.map((r) => r.dispatch_pcs || 0));
+    const balanceKgs = sum(sourceRows.map((r) => Math.max(0, r.balance_kgs)));
+    const balancePcs = sum(sourceRows.map((r) => Math.max(0, r.balance_pcs || 0)));
+    const invoiceTotal = sumOncePerOrder(sourceRows, (r) => r.invoice_total);
+    const paidTotal = sumOncePerOrder(sourceRows, (r) => r.paid_amount);
+    const bakiTotal = sumOncePerOrder(sourceRows, (r) => r.baki_amount);
     const profitPerKgWeighted =
-      orderKgs > 0 ? sum(rows.map((r) => (r.bill_rate - r.avg_cost) * r.order_kgs)) / orderKgs : 0;
+      orderKgs > 0 ? sum(sourceRows.map((r) => (r.bill_rate - r.avg_cost) * r.order_kgs)) / orderKgs : 0;
     return {
       lineCount,
       orderCount,
@@ -180,12 +186,7 @@ export function OrdersPage() {
       bakiTotal,
       profitPerKgWeighted,
     };
-  }, [rows]);
-
-  const shownRows = useMemo(() => {
-    if (!hideCompleted) return rows;
-    return rows.filter((r) => r.balance_kgs > 0.0001 || (r.balance_pcs || 0) > 0);
-  }, [rows, hideCompleted]);
+  }, [shownRows]);
 
   async function saveHeaderPatch(orderId: number, body: Parameters<typeof patchOrder>[1]) {
     setSaving(true);
