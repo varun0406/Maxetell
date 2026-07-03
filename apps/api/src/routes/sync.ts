@@ -75,7 +75,31 @@ export async function registerSyncRoutes(app: FastifyInstance, opts: { db: Db })
       ORDER BY o.order_date DESC, o.id DESC
     `).all(month);
 
-    // 2. Fetch Purchases for the month
+    // 2. Fetch Dispatches for the month
+    const dispatches = db.prepare(`
+      SELECT d.id, d.dispatch_date, d.dispatch_weight, d.dispatch_pcs, d.bundle_no,
+             o.wo_no, c.name as client_name, oli.item, oli.size, oli.grade
+      FROM dispatch_entries d
+      JOIN orders o ON d.order_id = o.id
+      JOIN clients c ON o.client_id = c.id
+      JOIN order_line_items oli ON d.order_line_item_id = oli.id
+      WHERE strftime('%Y-%m', d.dispatch_date) = ?
+      ORDER BY d.dispatch_date DESC, d.id DESC
+    `).all(month);
+
+    // 3. Fetch Sales Returns for the month
+    const salesReturns = db.prepare(`
+      SELECT sr.id, sr.return_date, sr.weight, sr.note, sr.remarks,
+             o.wo_no, c.name as client_name, p.item, p.size, p.grade
+      FROM sales_returns sr
+      LEFT JOIN orders o ON sr.order_id = o.id
+      LEFT JOIN clients c ON o.client_id = c.id
+      LEFT JOIN products p ON sr.product_id = p.id
+      WHERE strftime('%Y-%m', sr.return_date) = ?
+      ORDER BY sr.return_date DESC, sr.id DESC
+    `).all(month);
+
+    // 4. Fetch Purchases for the month
     const purchases = db.prepare(`
       SELECT 
         pe.id as purchase_entry_id, pe.po_no, pe.client_po_no, pe.purchase_date,
@@ -89,7 +113,31 @@ export async function registerSyncRoutes(app: FastifyInstance, opts: { db: Db })
       ORDER BY pe.purchase_date DESC, pe.id DESC
     `).all(month);
 
-    return { orders, purchases };
+    // 5. Fetch Purchase Receipts for the month
+    const receipts = db.prepare(`
+      SELECT pr.id, pr.receipt_date, pr.weight_received, pr.note,
+             pe.po_no, s.name as supplier_name, p.item, p.size, p.grade
+      FROM purchase_receipts pr
+      JOIN purchase_entries pe ON pr.purchase_entry_id = pe.id
+      JOIN suppliers s ON pe.supplier_id = s.id
+      LEFT JOIN products p ON pe.product_id = p.id
+      WHERE strftime('%Y-%m', pr.receipt_date) = ?
+      ORDER BY pr.receipt_date DESC, pr.id DESC
+    `).all(month);
+
+    // 6. Fetch Purchase Returns for the month
+    const purchaseReturns = db.prepare(`
+      SELECT pr.id, pr.return_date, pr.weight, pr.note, pr.remarks,
+             pe.po_no, s.name as supplier_name, p.item, p.size, p.grade
+      FROM purchase_returns pr
+      JOIN purchase_entries pe ON pr.purchase_entry_id = pe.id
+      JOIN suppliers s ON pe.supplier_id = s.id
+      LEFT JOIN products p ON pe.product_id = p.id
+      WHERE strftime('%Y-%m', pr.return_date) = ?
+      ORDER BY pr.return_date DESC, pr.id DESC
+    `).all(month);
+
+    return { orders, dispatches, salesReturns, purchases, receipts, purchaseReturns };
   });
 
   app.post("/sync/import", async (req) => {

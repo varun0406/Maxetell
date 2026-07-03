@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS order_line_items (
   migrateDispatchSchema(db);
   migrateAppSettings(db);
   migrateAppUsers(db);
+  migrateJobWorkOut(db);
 }
 
 function migrateAppUsers(db: Db) {
@@ -504,5 +505,31 @@ export function seed(db: Db) {
   insDispatch.run(o1, lineO1, "2026-04-01", 400, "Truck");
   insDispatch.run(o1, lineO1, "2026-04-02", 500, "Tempo");
   insDispatch.run(o2, lineO2, "2026-04-02", 750, "Truck");
+}
+
+function migrateJobWorkOut(db: Db) {
+  if (!columnExists(db, "job_work_out_sent", "client_id")) {
+    db.exec(`DROP TABLE IF EXISTS job_work_out_sent`);
+    db.exec(`DROP TABLE IF EXISTS job_work_out_receipt`);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS job_work_out_sent (
+        id INTEGER PRIMARY KEY,
+        client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
+        challan_date TEXT NOT NULL,
+        description TEXT NOT NULL,
+        qty REAL NOT NULL CHECK(qty >= 0),
+        short_qty REAL DEFAULT 0 CHECK(short_qty >= 0),
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS job_work_out_receipt (
+        id INTEGER PRIMARY KEY,
+        client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
+        receipt_date TEXT NOT NULL,
+        receipt_qty REAL NOT NULL CHECK(receipt_qty >= 0),
+        process_loss REAL DEFAULT 0 CHECK(process_loss >= 0),
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+  }
 }
 

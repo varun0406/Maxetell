@@ -102,7 +102,7 @@ export function ReturnsPage() {
     setSaving(true);
     setErr(null);
     try {
-      const { orders: syncOrders, purchases: syncPurchases } = await fetchSyncExport(syncMonth);
+      const { orders: syncOrders, purchases: syncPurchases, dispatches: syncDispatches, salesReturns: syncSalesReturns, receipts: syncReceipts, purchaseReturns: syncPurchaseReturns } = await fetchSyncExport(syncMonth);
       
       const wb = XLSX.utils.book_new();
 
@@ -151,6 +151,61 @@ export function ReturnsPage() {
       }));
       const wsPurchase = XLSX.utils.json_to_sheet(purchaseData);
       XLSX.utils.book_append_sheet(wb, wsPurchase, "Purchases & Receipts");
+
+      const histDispatches = syncDispatches.map(d => ({
+        "Dispatch ID": d.id,
+        "Dispatch Date": d.dispatch_date,
+        "Weight (kg)": d.dispatch_weight,
+        "Pcs": d.dispatch_pcs,
+        "Bundle No": d.bundle_no || "",
+        "WO No": d.wo_no,
+        "Client": d.client_name,
+        "Item": d.item,
+        "Size": d.size,
+        "Grade": d.grade
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(histDispatches), "Historical Dispatches");
+
+      const histSalesReturns = syncSalesReturns.map(sr => ({
+        "Return ID": sr.id,
+        "Return Date": sr.return_date,
+        "Weight (kg)": sr.weight,
+        "Note": sr.note || "",
+        "Remarks": sr.remarks || "",
+        "WO No": sr.wo_no,
+        "Client": sr.client_name,
+        "Item": sr.item,
+        "Size": sr.size,
+        "Grade": sr.grade
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(histSalesReturns), "Historical Sales Returns");
+
+      const histReceipts = syncReceipts.map(r => ({
+        "Receipt ID": r.id,
+        "Receipt Date": r.receipt_date,
+        "Weight Received": r.weight_received,
+        "Note": r.note || "",
+        "PO No": r.po_no || "",
+        "Supplier": r.supplier_name,
+        "Item": r.item,
+        "Size": r.size,
+        "Grade": r.grade
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(histReceipts), "Historical Receipts");
+
+      const histPurchaseReturns = syncPurchaseReturns.map(pr => ({
+        "Return ID": pr.id,
+        "Return Date": pr.return_date,
+        "Weight (kg)": pr.weight,
+        "Note": pr.note || "",
+        "Remarks": pr.remarks || "",
+        "PO No": pr.po_no || "",
+        "Supplier": pr.supplier_name,
+        "Item": pr.item,
+        "Size": pr.size,
+        "Grade": pr.grade
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(histPurchaseReturns), "Historical Purchase Returns");
 
       XLSX.writeFile(wb, `returns_sync_${syncMonth}.xlsx`);
     } catch (e: unknown) {
@@ -307,7 +362,7 @@ export function ReturnsPage() {
       <Card sx={{ mb: 2 }}>
         <CardContent>
           <Typography fontWeight={900} sx={{ mb: 1 }}>
-            Monthly Excel Bulk Sync
+            Monthly Report & Bulk Sync
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Select a month to export all orders and purchases. The exported XLSX will have empty columns for new Returns, Dispatches, and Receipts. 

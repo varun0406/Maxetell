@@ -730,7 +730,14 @@ export async function deleteJobWorkOutReceipt(id: number) {
 }
 
 export async function fetchSyncExport(month: string) {
-  const res = await api.get<{ orders: any[]; purchases: any[] }>(`/sync/export?month=${month}`);
+  const res = await api.get<{ 
+    orders: any[]; 
+    dispatches: any[]; 
+    salesReturns: any[]; 
+    purchases: any[]; 
+    receipts: any[]; 
+    purchaseReturns: any[]; 
+  }>(`/sync/export?month=${month}`);
   return res.data;
 }
 
