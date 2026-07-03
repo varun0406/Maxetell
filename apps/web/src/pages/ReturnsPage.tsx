@@ -120,10 +120,15 @@ export function ReturnsPage() {
         "New Sales Return Weight (kg)": "",
         "New Sales Return Date (YYYY-MM-DD)": dayjs().format("YYYY-MM-DD"),
         "Return Note": "",
-        "Return Remarks": ""
+        "Return Remarks": "",
+        "New Dispatch Weight (kg)": "",
+        "New Dispatch Date (YYYY-MM-DD)": dayjs().format("YYYY-MM-DD"),
+        "New Dispatch Pcs": "",
+        "New Bundle No": "",
+        "Line ID (DO NOT EDIT)": o.line_id
       }));
       const wsSales = XLSX.utils.json_to_sheet(salesData);
-      XLSX.utils.book_append_sheet(wb, wsSales, "Sales Returns");
+      XLSX.utils.book_append_sheet(wb, wsSales, "Sales & Dispatches");
 
       const purchaseData = syncPurchases.map(p => ({
         "Purchase Entry ID (DO NOT EDIT)": p.purchase_entry_id,
@@ -139,10 +144,13 @@ export function ReturnsPage() {
         "New Purchase Return Weight (kg)": "",
         "New Purchase Return Date (YYYY-MM-DD)": dayjs().format("YYYY-MM-DD"),
         "Return Note": "",
-        "Return Remarks": ""
+        "Return Remarks": "",
+        "New Receipt Weight (kg)": "",
+        "New Receipt Date (YYYY-MM-DD)": dayjs().format("YYYY-MM-DD"),
+        "Receipt Note": ""
       }));
       const wsPurchase = XLSX.utils.json_to_sheet(purchaseData);
-      XLSX.utils.book_append_sheet(wb, wsPurchase, "Purchase Returns");
+      XLSX.utils.book_append_sheet(wb, wsPurchase, "Purchases & Receipts");
 
       XLSX.writeFile(wb, `returns_sync_${syncMonth}.xlsx`);
     } catch (e: unknown) {
@@ -166,23 +174,51 @@ export function ReturnsPage() {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: "array" });
         
-        const wsSales = wb.Sheets["Sales Returns"];
-        const wsPurchases = wb.Sheets["Purchase Returns"];
+        const wsSales = wb.Sheets["Sales & Dispatches"] || wb.Sheets["Sales Returns"];
+        const wsPurchases = wb.Sheets["Purchases & Receipts"] || wb.Sheets["Purchase Returns"];
 
         const salesReturns: any[] = [];
         const purchaseReturns: any[] = [];
+        const dispatches: any[] = [];
+        const receipts: any[] = [];
+        const newOrders: any[] = [];
+        const newPurchases: any[] = [];
 
         if (wsSales) {
           const rows = XLSX.utils.sheet_to_json<any>(wsSales);
           for (const row of rows) {
-            const weight = Number(row["New Sales Return Weight (kg)"]);
-            if (weight > 0) {
-              salesReturns.push({
-                order_id: Number(row["Order ID (DO NOT EDIT)"]),
-                weight: weight,
-                return_date: row["New Sales Return Date (YYYY-MM-DD)"],
-                note: row["Return Note"]?.toString() || "",
-                remarks: row["Return Remarks"]?.toString() || ""
+            const orderId = Number(row["Order ID (DO NOT EDIT)"]);
+            if (orderId) {
+              const retWeight = Number(row["New Sales Return Weight (kg)"]);
+              if (retWeight > 0) {
+                salesReturns.push({
+                  order_id: orderId,
+                  weight: retWeight,
+                  return_date: row["New Sales Return Date (YYYY-MM-DD)"],
+                  note: row["Return Note"]?.toString() || "",
+                  remarks: row["Return Remarks"]?.toString() || ""
+                });
+              }
+              const dispWeight = Number(row["New Dispatch Weight (kg)"]);
+              if (dispWeight > 0) {
+                dispatches.push({
+                  order_id: orderId,
+                  order_line_item_id: Number(row["Line ID (DO NOT EDIT)"]),
+                  dispatch_weight: dispWeight,
+                  dispatch_date: row["New Dispatch Date (YYYY-MM-DD)"],
+                  dispatch_pcs: Number(row["New Dispatch Pcs"]) || 0,
+                  bundle_no: row["New Bundle No"]?.toString() || ""
+                });
+              }
+            } else if (row["WO No"] && row["Client Name"] && row["Order Kgs"] > 0) {
+              newOrders.push({
+                wo_no: row["WO No"]?.toString(),
+                order_date: row["Order Date"]?.toString() || dayjs().format("YYYY-MM-DD"),
+                client_name: row["Client Name"]?.toString(),
+                item: row["Item"]?.toString(),
+                size: row["Size"]?.toString(),
+                grade: row["Grade"]?.toString(),
+                order_kgs: Number(row["Order Kgs"])
               });
             }
           }
@@ -191,25 +227,47 @@ export function ReturnsPage() {
         if (wsPurchases) {
           const rows = XLSX.utils.sheet_to_json<any>(wsPurchases);
           for (const row of rows) {
-            const weight = Number(row["New Purchase Return Weight (kg)"]);
-            if (weight > 0) {
-              purchaseReturns.push({
-                purchase_entry_id: Number(row["Purchase Entry ID (DO NOT EDIT)"]),
-                weight: weight,
-                return_date: row["New Purchase Return Date (YYYY-MM-DD)"],
-                note: row["Return Note"]?.toString() || "",
-                remarks: row["Return Remarks"]?.toString() || ""
+            const purchaseEntryId = Number(row["Purchase Entry ID (DO NOT EDIT)"]);
+            if (purchaseEntryId) {
+              const retWeight = Number(row["New Purchase Return Weight (kg)"]);
+              if (retWeight > 0) {
+                purchaseReturns.push({
+                  purchase_entry_id: purchaseEntryId,
+                  weight: retWeight,
+                  return_date: row["New Purchase Return Date (YYYY-MM-DD)"],
+                  note: row["Return Note"]?.toString() || "",
+                  remarks: row["Return Remarks"]?.toString() || ""
+                });
+              }
+              const recWeight = Number(row["New Receipt Weight (kg)"]);
+              if (recWeight > 0) {
+                receipts.push({
+                  purchase_entry_id: purchaseEntryId,
+                  weight_received: recWeight,
+                  receipt_date: row["New Receipt Date (YYYY-MM-DD)"],
+                  note: row["Receipt Note"]?.toString() || ""
+                });
+              }
+            } else if (row["Supplier"] && row["Ordered Weight"] > 0) {
+              newPurchases.push({
+                po_no: row["PO No"]?.toString(),
+                purchase_date: row["Purchase Date"]?.toString() || dayjs().format("YYYY-MM-DD"),
+                supplier_name: row["Supplier"]?.toString(),
+                item: row["Item"]?.toString() || "",
+                size: row["Size"]?.toString() || "",
+                grade: row["Grade"]?.toString() || "",
+                ordered_weight: Number(row["Ordered Weight"])
               });
             }
           }
         }
 
-        if (salesReturns.length === 0 && purchaseReturns.length === 0) {
-          throw new Error("No valid returns found to import. Make sure you entered weights > 0 in the new columns.");
+        if (salesReturns.length === 0 && purchaseReturns.length === 0 && dispatches.length === 0 && receipts.length === 0 && newOrders.length === 0 && newPurchases.length === 0) {
+          throw new Error("No valid data found to import. Make sure you entered weights > 0 in the new columns or added new rows with valid data.");
         }
 
-        const res = await importSyncReturns({ salesReturns, purchaseReturns });
-        setSuccess(`Successfully imported ${res.importedSales} sales returns and ${res.importedPurchases} purchase returns.`);
+        const res = await importSyncReturns({ salesReturns, purchaseReturns, dispatches, receipts, newOrders, newPurchases });
+        setSuccess(`Successfully imported ${res.importedSales} sales returns, ${res.importedDispatches} dispatches, ${res.importedPurchases} purchase returns, ${res.importedReceipts} purchase receipts, ${res.importedNewOrders} new orders, and ${res.importedNewPurchases} new purchases.`);
         await refresh();
       } catch (err: any) {
         setErr(err.message || "Failed to process XLSX file.");
@@ -252,8 +310,8 @@ export function ReturnsPage() {
             Monthly Excel Bulk Sync
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Select a month to export all orders and purchases. The exported XLSX will have empty columns for new Returns. 
-            Fill them out and upload the file back here to bulk-import your returns.
+            Select a month to export all orders and purchases. The exported XLSX will have empty columns for new Returns, Dispatches, and Receipts. 
+            Fill them out to bulk-import operations on existing records. You can also bulk-create completely new Orders or Purchases by adding new rows and leaving the ID columns blank!
           </Typography>
           <Stack direction="row" spacing={2} alignItems="center">
             <TextField 

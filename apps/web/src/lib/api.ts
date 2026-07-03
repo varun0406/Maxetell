@@ -737,6 +737,10 @@ export async function fetchSyncExport(month: string) {
 export async function importSyncReturns(body: {
   salesReturns: { order_id: number; return_date: string; weight: number; note?: string; remarks?: string }[];
   purchaseReturns: { purchase_entry_id: number; return_date: string; weight: number; note?: string; remarks?: string }[];
+  dispatches: { order_id: number; order_line_item_id: number; dispatch_date: string; dispatch_weight: number; dispatch_pcs?: number; bundle_no?: string }[];
+  receipts: { purchase_entry_id: number; receipt_date: string; weight_received: number; note?: string }[];
+  newOrders: { wo_no: string; order_date: string; client_name: string; item: string; size: string; grade: string; order_kgs: number }[];
+  newPurchases: { po_no?: string; purchase_date: string; supplier_name: string; item: string; size: string; grade: string; ordered_weight: number }[];
 }) {
   const res = await api.post("/sync/import", body);
   return res.data;
