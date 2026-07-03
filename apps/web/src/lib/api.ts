@@ -605,40 +605,62 @@ export async function deletePurchaseReturn(id: number) {
   return res.data.data;
 }
 
+export type JobWorkClient = {
+  id: number;
+  name: string;
+  created_at: string;
+};
+
+export async function fetchJobWorkClients() {
+  const res = await api.get<{ data: JobWorkClient[] }>("/jobwork/clients");
+  return res.data.data;
+}
+
+export async function createJobWorkClient(name: string) {
+  const res = await api.post<{ data: { id: number }; error?: string }>("/jobwork/clients", { name });
+  if (res.data.error) throw new Error(res.data.error);
+  return res.data.data;
+}
+
+export type JobWorkInward = {
+  id: number;
+  client_id: number;
+  challan_date: string;
+  description: string;
+  qty: number;
+  short_qty: number;
+  created_at: string;
+};
+
 export type JobWorkOutward = {
   id: number;
-  inward_id: number;
+  client_id: number;
   dispatch_date: string;
   dispatch_qty: number;
   process_loss: number;
   created_at: string;
 };
 
-export type JobWorkInward = {
-  id: number;
-  challan_date: string;
-  description: string;
-  qty: number;
-  short_qty: number;
-  created_at: string;
-  final_qty: number;
-  dispatches: JobWorkOutward[];
+export type JobWorkClientLedger = JobWorkClient & {
+  inwards: JobWorkInward[];
+  outwards: JobWorkOutward[];
+  total_inward: number;
   total_dispatched: number;
   total_loss: number;
   balance: number;
 };
 
 export async function fetchJobWorkList() {
-  const res = await api.get<{ data: JobWorkInward[] }>("/jobwork");
+  const res = await api.get<{ data: JobWorkClientLedger[] }>("/jobwork");
   return res.data.data;
 }
 
-export async function createJobWorkInward(body: { challan_date: string; description: string; qty: number; short_qty?: number }) {
+export async function createJobWorkInward(body: { client_id: number; challan_date: string; description: string; qty: number; short_qty?: number }) {
   const res = await api.post<{ data: { id: number } }>("/jobwork/inward", body);
   return res.data.data;
 }
 
-export async function createJobWorkOutward(body: { inward_id: number; dispatch_date: string; dispatch_qty: number; process_loss?: number }) {
+export async function createJobWorkOutward(body: { client_id: number; dispatch_date: string; dispatch_qty: number; process_loss?: number }) {
   const res = await api.post<{ data: { id: number } }>("/jobwork/outward", body);
   return res.data.data;
 }
@@ -656,40 +678,45 @@ export async function mergeInventoryItems(body: { sourceName: string; targetName
   return res.data;
 }
 
+export type JobWorkOutSent = {
+  id: number;
+  client_id: number;
+  challan_date: string;
+  description: string;
+  qty: number;
+  short_qty: number;
+  created_at: string;
+};
+
 export type JobWorkOutReceipt = {
   id: number;
-  sent_id: number;
+  client_id: number;
   receipt_date: string;
   receipt_qty: number;
   process_loss: number;
   created_at: string;
 };
 
-export type JobWorkOutSent = {
-  id: number;
-  challan_date: string;
-  description: string;
-  qty: number;
-  short_qty: number;
-  created_at: string;
-  final_qty: number;
+export type JobWorkOutClientLedger = JobWorkClient & {
+  sents: JobWorkOutSent[];
   receipts: JobWorkOutReceipt[];
+  total_sent: number;
   total_received: number;
   total_loss: number;
   balance: number;
 };
 
 export async function fetchJobWorkOutList() {
-  const res = await api.get<{ data: JobWorkOutSent[] }>("/jobwork-out");
+  const res = await api.get<{ data: JobWorkOutClientLedger[] }>("/jobwork-out");
   return res.data.data;
 }
 
-export async function createJobWorkOutSent(body: { challan_date: string; description: string; qty: number; short_qty?: number }) {
+export async function createJobWorkOutSent(body: { client_id: number; challan_date: string; description: string; qty: number; short_qty?: number }) {
   const res = await api.post<{ data: { id: number } }>("/jobwork-out/sent", body);
   return res.data.data;
 }
 
-export async function createJobWorkOutReceipt(body: { sent_id: number; receipt_date: string; receipt_qty: number; process_loss?: number }) {
+export async function createJobWorkOutReceipt(body: { client_id: number; receipt_date: string; receipt_qty: number; process_loss?: number }) {
   const res = await api.post<{ data: { id: number } }>("/jobwork-out/receipt", body);
   return res.data.data;
 }
@@ -701,4 +728,3 @@ export async function deleteJobWorkOutSent(id: number) {
 export async function deleteJobWorkOutReceipt(id: number) {
   await api.delete(`/jobwork-out/receipt/${id}`);
 }
-

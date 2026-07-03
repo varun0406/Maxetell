@@ -15,16 +15,21 @@ import {
   TextField,
   Typography,
   Tooltip,
+  MenuItem,
 } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import {
   fetchJobWorkOutList,
+  fetchJobWorkClients,
+  createJobWorkClient,
   createJobWorkOutSent,
   createJobWorkOutReceipt,
   deleteJobWorkOutSent,
   deleteJobWorkOutReceipt,
-  type JobWorkOutSent,
+  type JobWorkOutClientLedger,
+  type JobWorkClient,
 } from "../lib/api";
 import { exportToCsv } from "../lib/export";
 import dayjs from "dayjs";
@@ -32,15 +37,24 @@ import dayjs from "dayjs";
 export function JobWorkOutPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [items, setItems] = useState<JobWorkOutSent[]>([]);
+  const [items, setItems] = useState<JobWorkOutClientLedger[]>([]);
+  const [clients, setClients] = useState<JobWorkClient[]>([]);
   const [search, setSearch] = useState("");
 
   // Dialogs
+  const [clientOpen, setClientOpen] = useState(false);
   const [sentOpen, setSentOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
-  const [selectedSent, setSelectedSent] = useState<JobWorkOutSent | null>(null);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
+  
+  const [selectedClientLedger, setSelectedClientLedger] = useState<JobWorkOutClientLedger | null>(null);
+
+  // Client Form
+  const [clientName, setClientName] = useState("");
+  const [savingClient, setSavingClient] = useState(false);
 
   // Sent Form
+  const [sentClientId, setSentClientId] = useState<number | "">("");
   const [challanDate, setChallanDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [description, setDescription] = useState("");
   const [qty, setQty] = useState<number>(0);
@@ -48,6 +62,7 @@ export function JobWorkOutPage() {
   const [savingSent, setSavingSent] = useState(false);
 
   // Receipt Form
+  const [receiptClientId, setReceiptClientId] = useState<number | "">("");
   const [receiptDate, setReceiptDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [receiptQty, setReceiptQty] = useState<number>(0);
   const [processLoss, setProcessLoss] = useState<number>(0);
@@ -56,8 +71,20 @@ export function JobWorkOutPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const data = await fetchJobWorkOutList();
-      setItems(data);
+      const [ledgersData, clientsData] = await Promise.all([
+        fetchJobWorkOutList(),
+        fetchJobWorkClients()
+      ]);
+      setItems(ledgersData);
+      setClients(clientsData);
+      
+      // Update selected ledger if it's open
+      if (selectedClientLedger) {
+        const updated = ledgersData.find(l => l.id === selectedClientLedger.id);
+        if (updated) setSelectedClientLedger(updated);
+        else setLedgerOpen(false);
+      }
+
       setErr(null);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to load Job Work Out data");
@@ -73,46 +100,47 @@ export function JobWorkOutPage() {
   const filteredItems = useMemo(() => {
     if (!search) return items;
     const lower = search.toLowerCase();
-    return items.filter((item) =>
-      item.description.toLowerCase().includes(lower) ||
-      item.challan_date.includes(lower)
-    );
+    return items.filter((item) => item.name.toLowerCase().includes(lower));
   }, [items, search]);
 
   // Totals
   const totals = useMemo(() => {
-    let tQty = 0;
-    let tShort = 0;
-    let tFinal = 0;
+    let tSent = 0;
+    let tReceived = 0;
+    let tLoss = 0;
     let tBal = 0;
 
-    // Receipts columns totals (up to 4 columns)
-    const tReceipts = [0, 0, 0, 0];
-    const tLosses = [0, 0, 0, 0];
-
     for (const item of filteredItems) {
-      tQty += item.qty;
-      tShort += item.short_qty || 0;
-      tFinal += item.final_qty;
+      tSent += item.total_sent;
+      tReceived += item.total_received;
+      tLoss += item.total_loss;
       tBal += item.balance;
-
-      for (let i = 0; i < 4; i++) {
-        const r = item.receipts?.[i];
-        if (r) {
-          tReceipts[i] += r.receipt_qty;
-          tLosses[i] += r.process_loss || 0;
-        }
-      }
     }
 
-    return { tQty, tShort, tFinal, tBal, tReceipts, tLosses };
+    return { tSent, tReceived, tLoss, tBal };
   }, [filteredItems]);
 
+  async function handleAddClient() {
+    if (!clientName.trim()) return;
+    setSavingClient(true);
+    try {
+      await createJobWorkClient(clientName.trim());
+      setClientOpen(false);
+      setClientName("");
+      await loadData();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Failed to create client");
+    } finally {
+      setSavingClient(false);
+    }
+  }
+
   async function handleAddSent() {
-    if (!description || qty <= 0) return;
+    if (!sentClientId || !description || qty <= 0) return;
     setSavingSent(true);
     try {
       await createJobWorkOutSent({
+        client_id: Number(sentClientId),
         challan_date: challanDate,
         description,
         qty,
@@ -131,11 +159,11 @@ export function JobWorkOutPage() {
   }
 
   async function handleAddReceipt() {
-    if (!selectedSent || receiptQty <= 0) return;
+    if (!receiptClientId || receiptQty <= 0) return;
     setSavingReceipt(true);
     try {
       await createJobWorkOutReceipt({
-        sent_id: selectedSent.id,
+        client_id: Number(receiptClientId),
         receipt_date: receiptDate,
         receipt_qty: receiptQty,
         process_loss: processLoss,
@@ -143,7 +171,6 @@ export function JobWorkOutPage() {
       setReceiptOpen(false);
       setReceiptQty(0);
       setProcessLoss(0);
-      setSelectedSent(null);
       await loadData();
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Failed to add receipt");
@@ -153,7 +180,7 @@ export function JobWorkOutPage() {
   }
 
   async function handleDeleteSent(id: number) {
-    if (!window.confirm("Are you sure you want to delete this outward job work?")) return;
+    if (!window.confirm("Are you sure you want to delete this outward entry?")) return;
     try {
       await deleteJobWorkOutSent(id);
       await loadData();
@@ -163,7 +190,7 @@ export function JobWorkOutPage() {
   }
 
   async function handleDeleteReceipt(id: number) {
-    if (!window.confirm("Delete this receipt?")) return;
+    if (!window.confirm("Are you sure you want to delete this receipt entry?")) return;
     try {
       await deleteJobWorkOutReceipt(id);
       await loadData();
@@ -173,47 +200,51 @@ export function JobWorkOutPage() {
   }
 
   function handleExport() {
-    const csvData = filteredItems.map(item => {
-      return {
-        "Dated": item.challan_date.split("T")[0],
-        "Description": item.description,
-        "Qty": item.qty,
-        "Short Qty": item.short_qty || 0,
-        "Final Qty": item.final_qty,
-        "Rec-1 Date": item.receipts?.[0]?.receipt_date.split("T")[0] || "",
-        "Rec-1 Qty": item.receipts?.[0]?.receipt_qty || "",
-        "Rec-1 Loss": item.receipts?.[0]?.process_loss || "",
-        "Rec-2 Date": item.receipts?.[1]?.receipt_date.split("T")[0] || "",
-        "Rec-2 Qty": item.receipts?.[1]?.receipt_qty || "",
-        "Rec-2 Loss": item.receipts?.[1]?.process_loss || "",
-        "Rec-3 Date": item.receipts?.[2]?.receipt_date.split("T")[0] || "",
-        "Rec-3 Qty": item.receipts?.[2]?.receipt_qty || "",
-        "Rec-3 Loss": item.receipts?.[2]?.process_loss || "",
-        "Rec-4 Date": item.receipts?.[3]?.receipt_date.split("T")[0] || "",
-        "Rec-4 Qty": item.receipts?.[3]?.receipt_qty || "",
-        "Rec-4 Loss": item.receipts?.[3]?.process_loss || "",
-        "Balance": item.balance
-      };
-    });
-    exportToCsv("job_work_out_report", csvData);
+    const csvData = filteredItems.map(item => ({
+      "Client": item.name,
+      "Total Sent": item.total_sent,
+      "Total Received": item.total_received,
+      "Total Loss": item.total_loss,
+      "Balance": item.balance
+    }));
+    exportToCsv("job_work_out_client_report", csvData);
   }
+
+  // Generate Ledger View Rows
+  const ledgerRows = useMemo(() => {
+    if (!selectedClientLedger) return [];
+    
+    type Row = { type: 'sent' | 'receipt'; date: string; desc?: string; qty: number; short?: number; loss?: number; id: number };
+    
+    const rows: Row[] = [];
+    selectedClientLedger.sents.forEach(s => {
+      rows.push({ type: 'sent', date: s.challan_date, desc: s.description, qty: s.qty, short: s.short_qty, id: s.id });
+    });
+    selectedClientLedger.receipts.forEach(r => {
+      rows.push({ type: 'receipt', date: r.receipt_date, qty: r.receipt_qty, loss: r.process_loss, id: r.id });
+    });
+    
+    return rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [selectedClientLedger]);
 
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" gap={1}>
         <Typography variant="h5" fontWeight={900}>
-          Job Work Out System
+          Job Work System (Outward)
         </Typography>
         <Stack direction="row" spacing={1}>
-          <Button
-            variant="outlined"
-            onClick={handleExport}
-            disabled={items.length === 0}
-          >
+          <Button variant="outlined" onClick={handleExport} disabled={items.length === 0}>
             Export Report
           </Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setSentOpen(true)}>
-            Add Outward Challan
+          <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={() => setClientOpen(true)}>
+            Add Client
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setSentClientId(""); setSentOpen(true); }}>
+            Send Goods
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setReceiptClientId(""); setReceiptOpen(true); }}>
+            Receive
           </Button>
         </Stack>
       </Stack>
@@ -229,10 +260,10 @@ export function JobWorkOutPage() {
         <Card sx={{ flex: 1, minWidth: 200 }}>
           <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
             <Typography variant="caption" color="text.secondary" fontWeight={700}>
-              TOTAL SENT QTY
+              TOTAL SENT (NET)
             </Typography>
             <Typography variant="h5" fontWeight={900}>
-              {Math.round(totals.tFinal).toLocaleString()} kg
+              {Math.round(totals.tSent).toLocaleString()} kg
             </Typography>
           </CardContent>
         </Card>
@@ -242,7 +273,7 @@ export function JobWorkOutPage() {
               TOTAL RECEIVED
             </Typography>
             <Typography variant="h5" fontWeight={900} color="success.main">
-              {Math.round(items.reduce((acc, x) => acc + x.total_received, 0)).toLocaleString()} kg
+              {Math.round(totals.tReceived).toLocaleString()} kg
             </Typography>
           </CardContent>
         </Card>
@@ -252,7 +283,7 @@ export function JobWorkOutPage() {
               PROCESS LOSS
             </Typography>
             <Typography variant="h5" fontWeight={900} color="warning.main">
-              {Math.round(items.reduce((acc, x) => acc + (x.total_loss || 0), 0)).toLocaleString()} kg
+              {Math.round(totals.tLoss).toLocaleString()} kg
             </Typography>
           </CardContent>
         </Card>
@@ -269,7 +300,7 @@ export function JobWorkOutPage() {
       </Stack>
 
       <TextField
-        label="Search Description or Date"
+        label="Search Client"
         variant="outlined"
         size="small"
         fullWidth
@@ -287,49 +318,25 @@ export function JobWorkOutPage() {
       ) : (
         <Card>
           <Box sx={{ overflowX: "auto" }}>
-            <Box sx={{ minWidth: 1550 }}>
-              {/* Main Sheet Header */}
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "100px 220px 280px 200px 200px 200px 200px 100px 100px",
-                  borderBottom: "2px solid rgba(0,0,0,0.12)",
-                  fontWeight: 900,
-                  bgcolor: "rgba(0,0,0,0.03)",
-                  fontSize: 13,
-                  textAlign: "center",
-                }}
-              >
-                <Box sx={{ borderRight: "1px solid rgba(0,0,0,0.08)", p: 1, gridColumn: "span 5" }}>OUTWARD DETAILS</Box>
-                <Box sx={{ borderRight: "1px solid rgba(0,0,0,0.08)", p: 1, gridColumn: "span 3" }}>RECEIPT DETAILS</Box>
-                <Box sx={{ p: 1 }}>BALANCE</Box>
-              </Box>
-
+            <Box sx={{ minWidth: 800 }}>
               {/* Column Headers */}
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "100px 220px 90px 90px 100px 200px 200px 200px 200px 100px 100px",
+                  gridTemplateColumns: "1fr 150px 150px 150px 150px 120px",
                   borderBottom: "1px solid rgba(0,0,0,0.12)",
                   fontWeight: 800,
-                  bgcolor: "rgba(0,0,0,0.01)",
-                  fontSize: 12.5,
-                  p: 0.5,
+                  bgcolor: "rgba(0,0,0,0.03)",
+                  fontSize: 13,
+                  p: 1.5,
                 }}
               >
-                <Box sx={{ p: 0.5 }}>DATED</Box>
-                <Box sx={{ p: 0.5 }}>DESP</Box>
-                <Box sx={{ p: 0.5, textAlign: "right" }}>QTY</Box>
-                <Box sx={{ p: 0.5, textAlign: "right" }}>SHORT QTY</Box>
-                <Box sx={{ p: 0.5, textAlign: "right" }}>FINAL Qty</Box>
-
-                <Box sx={{ p: 0.5, textAlign: "center" }}>REC-1 DETAILS</Box>
-                <Box sx={{ p: 0.5, textAlign: "center" }}>REC-2 DETAILS</Box>
-                <Box sx={{ p: 0.5, textAlign: "center" }}>REC-3 DETAILS</Box>
-                <Box sx={{ p: 0.5, textAlign: "center" }}>REC-4 DETAILS</Box>
-
-                <Box sx={{ p: 0.5, textAlign: "right" }}>BAL</Box>
-                <Box sx={{ p: 0.5, textAlign: "center" }}>ACTIONS</Box>
+                <Box>CLIENT NAME</Box>
+                <Box sx={{ textAlign: "right" }}>SENT (NET)</Box>
+                <Box sx={{ textAlign: "right" }}>RECEIVED</Box>
+                <Box sx={{ textAlign: "right" }}>LOSS</Box>
+                <Box sx={{ textAlign: "right" }}>BALANCE</Box>
+                <Box sx={{ textAlign: "center" }}>ACTIONS</Box>
               </Box>
 
               {/* Rows */}
@@ -338,86 +345,27 @@ export function JobWorkOutPage() {
                   key={item.id}
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: "100px 220px 90px 90px 100px 200px 200px 200px 200px 100px 100px",
+                    gridTemplateColumns: "1fr 150px 150px 150px 150px 120px",
                     borderBottom: "1px solid rgba(0,0,0,0.05)",
-                    fontSize: 12.5,
-                    p: 0.5,
+                    fontSize: 13,
+                    p: 1.5,
                     alignItems: "center",
-                    "&:hover": { bgcolor: "rgba(0,0,0,0.01)" },
+                    "&:hover": { bgcolor: "rgba(0,0,0,0.02)" },
                   }}
                 >
-                  <Box sx={{ p: 0.5 }}>{item.challan_date.split("T")[0]}</Box>
-                  <Box sx={{ p: 0.5, fontWeight: 700 }}>{item.description}</Box>
-                  <Box sx={{ p: 0.5, textAlign: "right" }}>{item.qty.toFixed(3)}</Box>
-                  <Box sx={{ p: 0.5, textAlign: "right", color: item.short_qty ? "error.main" : "text.secondary" }}>
-                    {item.short_qty ? item.short_qty.toFixed(3) : "—"}
-                  </Box>
-                  <Box sx={{ p: 0.5, textAlign: "right", fontWeight: 700 }}>{item.final_qty.toFixed(3)}</Box>
-
-                  {/* Receipts 1-4 */}
-                  {[0, 1, 2, 3].map((idx) => {
-                    const r = item.receipts?.[idx];
-                    return (
-                      <Box
-                        key={idx}
-                        sx={{
-                          p: 0.5,
-                          fontSize: 11.5,
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          borderRight: "1px dashed rgba(0,0,0,0.06)",
-                          minHeight: 28,
-                        }}
-                      >
-                        {r ? (
-                          <>
-                            <span>{r.receipt_date.split("T")[0]}</span>
-                            <span style={{ fontWeight: 700 }}>
-                              {r.receipt_qty.toFixed(1)} / L: {(r.process_loss || 0).toFixed(1)}
-                            </span>
-                            <Tooltip title="Delete Receipt">
-                              <IconButton size="small" onClick={() => handleDeleteReceipt(r.id)} color="error" sx={{ p: 0 }}>
-                                <DeleteOutlineIcon sx={{ fontSize: 14 }} />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        ) : (
-                          <span style={{ color: "rgba(0,0,0,0.25)", margin: "auto" }}>—</span>
-                        )}
-                      </Box>
-                    );
-                  })}
-
-                  <Box
-                    sx={{
-                      p: 0.5,
-                      textAlign: "right",
-                      fontWeight: 800,
-                      color: item.balance > 0.01 ? "error.main" : "text.primary",
-                    }}
-                  >
+                  <Box sx={{ fontWeight: 700 }}>{item.name}</Box>
+                  <Box sx={{ textAlign: "right" }}>{item.total_sent.toFixed(3)}</Box>
+                  <Box sx={{ textAlign: "right", color: "success.main" }}>{item.total_received.toFixed(3)}</Box>
+                  <Box sx={{ textAlign: "right", color: "warning.main" }}>{item.total_loss.toFixed(3)}</Box>
+                  <Box sx={{ textAlign: "right", fontWeight: 800, color: item.balance > 0.01 ? "error.main" : "text.primary" }}>
                     {item.balance.toFixed(3)}
                   </Box>
-
-                  <Box sx={{ p: 0.5, textAlign: "center" }}>
-                    <Stack direction="row" spacing={0.5} justifyContent="center">
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => {
-                          setSelectedSent(item);
-                          setReceiptOpen(true);
-                        }}
-                        sx={{ fontSize: 10, px: 1, py: 0.25, textTransform: "none" }}
-                        disabled={item.balance <= 0}
-                      >
-                        Receipt
-                      </Button>
-                      <IconButton size="small" color="error" onClick={() => handleDeleteSent(item.id)}>
-                        <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                  <Box sx={{ textAlign: "center" }}>
+                    <Tooltip title="View Ledger">
+                      <IconButton size="small" onClick={() => { setSelectedClientLedger(item); setLedgerOpen(true); }}>
+                        <VisibilityIcon fontSize="small" />
                       </IconButton>
-                    </Stack>
+                    </Tooltip>
                   </Box>
                 </Box>
               ))}
@@ -426,41 +374,129 @@ export function JobWorkOutPage() {
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "100px 220px 90px 90px 100px 200px 200px 200px 200px 100px 100px",
+                  gridTemplateColumns: "1fr 150px 150px 150px 150px 120px",
                   fontWeight: 900,
                   bgcolor: "rgba(0,0,0,0.03)",
-                  fontSize: 12.5,
-                  p: 0.75,
+                  fontSize: 13,
+                  p: 1.5,
                   borderTop: "2px solid rgba(0,0,0,0.12)",
                 }}
               >
-                <Box sx={{ p: 0.5 }}>TOTALS</Box>
-                <Box sx={{ p: 0.5 }}></Box>
-                <Box sx={{ p: 0.5, textAlign: "right" }}>{totals.tQty.toFixed(3)}</Box>
-                <Box sx={{ p: 0.5, textAlign: "right" }}>{totals.tShort.toFixed(3)}</Box>
-                <Box sx={{ p: 0.5, textAlign: "right" }}>{totals.tFinal.toFixed(3)}</Box>
-
-                {/* Receipt Columns Totals */}
-                {[0, 1, 2, 3].map((idx) => (
-                  <Box key={idx} sx={{ p: 0.5, display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
-                    <span>R: {totals.tReceipts[idx].toFixed(1)}</span>
-                    <span>L: {totals.tLosses[idx].toFixed(1)}</span>
-                  </Box>
-                ))}
-
-                <Box sx={{ p: 0.5, textAlign: "right" }}>{totals.tBal.toFixed(3)}</Box>
-                <Box sx={{ p: 0.5 }}></Box>
+                <Box>TOTALS</Box>
+                <Box sx={{ textAlign: "right" }}>{totals.tSent.toFixed(3)}</Box>
+                <Box sx={{ textAlign: "right", color: "success.main" }}>{totals.tReceived.toFixed(3)}</Box>
+                <Box sx={{ textAlign: "right", color: "warning.main" }}>{totals.tLoss.toFixed(3)}</Box>
+                <Box sx={{ textAlign: "right", color: "error.main" }}>{totals.tBal.toFixed(3)}</Box>
+                <Box></Box>
               </Box>
             </Box>
           </Box>
         </Card>
       )}
 
-      {/* New Outward Challan Dialog */}
+      {/* Ledger Dialog */}
+      <Dialog open={ledgerOpen} onClose={() => setLedgerOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle sx={{ fontWeight: 900 }}>
+          {selectedClientLedger?.name} - Job Work Out Ledger
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          <Box sx={{ minWidth: 600 }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "120px 1fr 120px 120px 60px",
+                borderBottom: "1px solid rgba(0,0,0,0.12)",
+                fontWeight: 800,
+                bgcolor: "rgba(0,0,0,0.03)",
+                fontSize: 13,
+                p: 1.5,
+              }}
+            >
+              <Box>DATE</Box>
+              <Box>TYPE / DESC</Box>
+              <Box sx={{ textAlign: "right" }}>SENT (QTY)</Box>
+              <Box sx={{ textAlign: "right" }}>IN (QTY+LOSS)</Box>
+              <Box sx={{ textAlign: "center" }}>DEL</Box>
+            </Box>
+            
+            {ledgerRows.map((row, i) => (
+              <Box
+                key={`${row.type}-${row.id}-${i}`}
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "120px 1fr 120px 120px 60px",
+                  borderBottom: "1px solid rgba(0,0,0,0.05)",
+                  fontSize: 13,
+                  p: 1,
+                  alignItems: "center",
+                  bgcolor: row.type === 'sent' ? "rgba(0,100,255,0.03)" : "rgba(255,100,0,0.03)",
+                }}
+              >
+                <Box>{row.date.split("T")[0]}</Box>
+                <Box>
+                  <Typography variant="body2" fontWeight={700}>
+                    {row.type === 'sent' ? "SENT" : "RECEIPT"}
+                  </Typography>
+                  {row.desc && <Typography variant="caption" color="text.secondary">{row.desc}</Typography>}
+                  {row.short && row.short > 0 ? <Typography variant="caption" color="error.main" display="block">Short: {row.short}</Typography> : null}
+                  {row.loss && row.loss > 0 ? <Typography variant="caption" color="warning.main" display="block">Loss: {row.loss}</Typography> : null}
+                </Box>
+                <Box sx={{ textAlign: "right", fontWeight: row.type === 'sent' ? 700 : 400 }}>
+                  {row.type === 'sent' ? (row.qty - (row.short || 0)).toFixed(3) : "—"}
+                </Box>
+                <Box sx={{ textAlign: "right", fontWeight: row.type === 'receipt' ? 700 : 400 }}>
+                  {row.type === 'receipt' ? (row.qty + (row.loss || 0)).toFixed(3) : "—"}
+                </Box>
+                <Box sx={{ textAlign: "center" }}>
+                  <IconButton size="small" color="error" onClick={() => row.type === 'sent' ? handleDeleteSent(row.id) : handleDeleteReceipt(row.id)}>
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLedgerOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Client Dialog */}
+      <Dialog open={clientOpen} onClose={() => !savingClient && setClientOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>New Client</DialogTitle>
+        <DialogContent dividers>
+          <TextField
+            label="Client Name"
+            fullWidth
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClientOpen(false)} disabled={savingClient}>Cancel</Button>
+          <Button variant="contained" onClick={handleAddClient} disabled={savingClient || !clientName.trim()}>
+            {savingClient ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* New Sent Challan Dialog */}
       <Dialog open={sentOpen} onClose={() => !savingSent && setSentOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>New Outward Challan</DialogTitle>
+        <DialogTitle>Add Outward Challan</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              select
+              label="Select Client"
+              fullWidth
+              value={sentClientId}
+              onChange={(e) => setSentClientId(Number(e.target.value))}
+            >
+              {clients.map(c => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              ))}
+            </TextField>
             <TextField
               label="Dated"
               type="date"
@@ -493,10 +529,8 @@ export function JobWorkOutPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSentOpen(false)} disabled={savingSent}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={handleAddSent} disabled={savingSent || !description || qty <= 0}>
+          <Button onClick={() => setSentOpen(false)} disabled={savingSent}>Cancel</Button>
+          <Button variant="contained" onClick={handleAddSent} disabled={savingSent || !sentClientId || !description || qty <= 0}>
             {savingSent ? "Saving…" : "Save"}
           </Button>
         </DialogActions>
@@ -506,15 +540,23 @@ export function JobWorkOutPage() {
       <Dialog open={receiptOpen} onClose={() => !savingReceipt && setReceiptOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Add Inward Receipt</DialogTitle>
         <DialogContent dividers>
-          {selectedSent && (
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              Item: <b>{selectedSent.description}</b> (Challan Date: {selectedSent.challan_date.split("T")[0]})
-              <br />
-              Final Qty: <b>{selectedSent.final_qty.toFixed(3)} kg</b> | Remaining Balance:{" "}
-              <b>{selectedSent.balance.toFixed(3)} kg</b>
-            </Typography>
-          )}
           <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              select
+              label="Select Client"
+              fullWidth
+              value={receiptClientId}
+              onChange={(e) => setReceiptClientId(Number(e.target.value))}
+            >
+              {clients.map(c => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              ))}
+            </TextField>
+            {receiptClientId && items.find(i => i.id === receiptClientId) && (
+              <Typography variant="body2" color="text.secondary">
+                Current Pending Balance: <b>{items.find(i => i.id === receiptClientId)?.balance.toFixed(3)} kg</b>
+              </Typography>
+            )}
             <TextField
               label="Receipt Date"
               type="date"
@@ -540,13 +582,11 @@ export function JobWorkOutPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setReceiptOpen(false)} disabled={savingReceipt}>
-            Cancel
-          </Button>
+          <Button onClick={() => setReceiptOpen(false)} disabled={savingReceipt}>Cancel</Button>
           <Button
             variant="contained"
             onClick={handleAddReceipt}
-            disabled={savingReceipt || receiptQty <= 0 || !!(selectedSent && receiptQty + processLoss > selectedSent.balance + 0.01)}
+            disabled={savingReceipt || !receiptClientId || receiptQty <= 0}
           >
             {savingReceipt ? "Saving…" : "Save"}
           </Button>

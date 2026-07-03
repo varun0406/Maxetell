@@ -177,8 +177,15 @@ CREATE TABLE IF NOT EXISTS purchase_returns (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS job_work_clients (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS job_work_inward (
   id INTEGER PRIMARY KEY,
+  client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
   challan_date TEXT NOT NULL,
   description TEXT NOT NULL,
   qty REAL NOT NULL CHECK(qty >= 0),
@@ -188,7 +195,7 @@ CREATE TABLE IF NOT EXISTS job_work_inward (
 
 CREATE TABLE IF NOT EXISTS job_work_outward (
   id INTEGER PRIMARY KEY,
-  inward_id INTEGER NOT NULL REFERENCES job_work_inward(id) ON DELETE CASCADE,
+  client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
   dispatch_date TEXT NOT NULL,
   dispatch_qty REAL NOT NULL CHECK(dispatch_qty >= 0),
   process_loss REAL DEFAULT 0 CHECK(process_loss >= 0),
@@ -197,6 +204,7 @@ CREATE TABLE IF NOT EXISTS job_work_outward (
 
 CREATE TABLE IF NOT EXISTS job_work_out_sent (
   id INTEGER PRIMARY KEY,
+  client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
   challan_date TEXT NOT NULL,
   description TEXT NOT NULL,
   qty REAL NOT NULL CHECK(qty >= 0),
@@ -206,7 +214,7 @@ CREATE TABLE IF NOT EXISTS job_work_out_sent (
 
 CREATE TABLE IF NOT EXISTS job_work_out_receipt (
   id INTEGER PRIMARY KEY,
-  sent_id INTEGER NOT NULL REFERENCES job_work_out_sent(id) ON DELETE CASCADE,
+  client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
   receipt_date TEXT NOT NULL,
   receipt_qty REAL NOT NULL CHECK(receipt_qty >= 0),
   process_loss REAL DEFAULT 0 CHECK(process_loss >= 0),
