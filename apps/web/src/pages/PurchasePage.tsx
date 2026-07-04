@@ -272,7 +272,7 @@ export function PurchasePage() {
 
   async function saveReceiptLine(
     id: number,
-    patch: Partial<Pick<PurchaseReceiptRow, "receipt_date" | "weight_received" | "note">>,
+    patch: Partial<Pick<PurchaseReceiptRow, "receipt_date" | "weight_received" | "client_invoice_no" | "note">>,
   ) {
     if (!drawerPo) return;
     setSaving(true);

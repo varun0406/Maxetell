@@ -29,6 +29,7 @@ export function DispatchPage() {
     client_po_no: string | null;
     client_name: string;
     order_date: string;
+    invoice_no: string | null;
   } | null>(null);
   const [order, setOrder] = useState<OrderRow | null>(null);
 
@@ -86,6 +87,7 @@ export function DispatchPage() {
           client_po_no: o.client_po_no,
           client_name: o.client_name,
           order_date: o.order_date,
+          invoice_no: o.invoice_no,
         });
       }
     }
