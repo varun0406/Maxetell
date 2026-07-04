@@ -143,7 +143,7 @@ export async function registerSyncRoutes(app: FastifyInstance, opts: { db: Db })
   app.post("/sync/csv-update", async (req) => {
     const body = z.object({
       table: z.enum(["orders", "order_line_items", "dispatch_entries", "purchase_entries", "purchase_receipts", "sales_returns", "purchase_returns"]),
-      rows: z.array(z.record(z.any()))
+      rows: z.array(z.record(z.string(), z.any()))
     }).parse(req.body);
 
     const allowedColumns: Record<string, string[]> = {
@@ -163,7 +163,8 @@ export async function registerSyncRoutes(app: FastifyInstance, opts: { db: Db })
     db.transaction(() => {
       for (const row of body.rows) {
         // Handle ID parsing
-        const id = parseInt(row.id || row.ID || row.Id, 10);
+        const idRaw = row.id || row.ID || row.Id;
+        const id = typeof idRaw === "number" ? idRaw : parseInt(String(idRaw), 10);
         if (!id || isNaN(id)) continue;
         
         const updates: string[] = [];
