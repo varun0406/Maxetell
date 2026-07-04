@@ -79,7 +79,8 @@ export async function registerSyncRoutes(app: FastifyInstance, opts: { db: Db })
     // 2. Fetch Dispatches for the month
     const dispatches = db.prepare(`
       SELECT d.id, d.dispatch_date, d.dispatch_weight, d.packing_weight, d.dispatch_pcs, d.bundle_no, d.transport, d.sales_rate,
-             o.wo_no, o.invoice_no, c.name as client_name, oli.item, oli.size, oli.grade
+             (SELECT GROUP_CONCAT(bill_no, ', ') FROM dispatch_tally_bills WHERE dispatch_entry_id = d.id) as tally_bills,
+             o.wo_no, c.name as client_name, oli.item, oli.size, oli.grade
       FROM dispatch_entries d
       JOIN orders o ON d.order_id = o.id
       JOIN clients c ON o.client_id = c.id

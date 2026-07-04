@@ -507,7 +507,7 @@ export async function patchPurchase(
 
 export async function patchPurchaseReceipt(
   receiptId: number,
-  body: Partial<Pick<PurchaseReceiptRow, "receipt_date" | "weight_received" | "note">>,
+  body: Partial<Pick<PurchaseReceiptRow, "receipt_date" | "weight_received" | "client_invoice_no" | "note">>,
 ) {
   const res = await api.patch<{ data: PurchaseLedgerRow }>(`/purchase-receipts/${receiptId}`, body);
   return res.data.data;

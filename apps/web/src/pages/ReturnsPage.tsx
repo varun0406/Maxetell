@@ -179,7 +179,7 @@ export function ReturnsPage() {
         "Bundle No": d.bundle_no || "",
         "Transport": d.transport || "",
         "Sales Rate": d.sales_rate || "",
-        "Invoice No": d.invoice_no || "",
+        "Invoice No": d.tally_bills || "",
         "WO No": d.wo_no,
         "Client": d.client_name,
         "Item": d.item,

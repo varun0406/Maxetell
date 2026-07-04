@@ -29,7 +29,6 @@ export function DispatchPage() {
     client_po_no: string | null;
     client_name: string;
     order_date: string;
-    invoice_no: string | null;
   } | null>(null);
   const [order, setOrder] = useState<OrderRow | null>(null);
 
@@ -87,7 +86,6 @@ export function DispatchPage() {
           client_po_no: o.client_po_no,
           client_name: o.client_name,
           order_date: o.order_date,
-          invoice_no: o.invoice_no,
         });
       }
     }
@@ -176,7 +174,7 @@ export function DispatchPage() {
               "Bundle No": e.bundle_no || "",
               "Transport": e.transport || "",
               "Sales Rate": e.sales_rate,
-              "Invoice No": selectedWO?.invoice_no || "",
+              "Invoice No": e.tally_bill_nos?.join(", ") || "",
               "WO No": selectedWO?.wo_no || "",
               "Item": e.item || "",
               "Size": e.size || "",
