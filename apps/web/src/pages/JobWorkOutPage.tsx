@@ -55,18 +55,36 @@ export function JobWorkOutPage() {
 
   // Sent Form
   const [sentClientId, setSentClientId] = useState<number | "">("");
+  const [sentChallanNo, setSentChallanNo] = useState("");
   const [challanDate, setChallanDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [description, setDescription] = useState("");
+  const [sentGross, setSentGross] = useState<number>(0);
+  const [sentTare, setSentTare] = useState<number>(0);
   const [qty, setQty] = useState<number>(0);
   const [shortQty, setShortQty] = useState<number>(0);
   const [savingSent, setSavingSent] = useState(false);
 
+  useEffect(() => {
+    if (sentGross > 0 || sentTare > 0) {
+      setQty(Math.max(0, sentGross - sentTare));
+    }
+  }, [sentGross, sentTare]);
+
   // Receipt Form
   const [receiptClientId, setReceiptClientId] = useState<number | "">("");
+  const [receiptChallanNo, setReceiptChallanNo] = useState("");
   const [receiptDate, setReceiptDate] = useState(dayjs().format("YYYY-MM-DD"));
+  const [receiptGross, setReceiptGross] = useState<number>(0);
+  const [receiptTare, setReceiptTare] = useState<number>(0);
   const [receiptQty, setReceiptQty] = useState<number>(0);
   const [processLoss, setProcessLoss] = useState<number>(0);
   const [savingReceipt, setSavingReceipt] = useState(false);
+
+  useEffect(() => {
+    if (receiptGross > 0 || receiptTare > 0) {
+      setReceiptQty(Math.max(0, receiptGross - receiptTare));
+    }
+  }, [receiptGross, receiptTare]);
 
   async function loadData() {
     setLoading(true);
@@ -141,13 +159,19 @@ export function JobWorkOutPage() {
     try {
       await createJobWorkOutSent({
         client_id: Number(sentClientId),
+        challan_no: sentChallanNo,
         challan_date: challanDate,
         description,
         qty,
         short_qty: shortQty,
+        gross_weight: sentGross,
+        tare_weight: sentTare,
       });
       setSentOpen(false);
+      setSentChallanNo("");
       setDescription("");
+      setSentGross(0);
+      setSentTare(0);
       setQty(0);
       setShortQty(0);
       await loadData();
@@ -164,11 +188,17 @@ export function JobWorkOutPage() {
     try {
       await createJobWorkOutReceipt({
         client_id: Number(receiptClientId),
+        challan_no: receiptChallanNo,
         receipt_date: receiptDate,
         receipt_qty: receiptQty,
         process_loss: processLoss,
+        gross_weight: receiptGross,
+        tare_weight: receiptTare,
       });
       setReceiptOpen(false);
+      setReceiptChallanNo("");
+      setReceiptGross(0);
+      setReceiptTare(0);
       setReceiptQty(0);
       setProcessLoss(0);
       await loadData();
@@ -218,10 +248,10 @@ export function JobWorkOutPage() {
     
     const rows: Row[] = [];
     selectedClientLedger.sents.forEach(s => {
-      rows.push({ type: 'sent', date: s.challan_date, desc: s.description, qty: s.qty, short: s.short_qty, id: s.id });
+      rows.push({ type: 'sent', date: s.challan_date, desc: s.description + (s.challan_no ? ` (Challan: ${s.challan_no})` : ""), qty: s.qty, short: s.short_qty, id: s.id });
     });
     selectedClientLedger.receipts.forEach(r => {
-      rows.push({ type: 'receipt', date: r.receipt_date, qty: r.receipt_qty, loss: r.process_loss, id: r.id });
+      rows.push({ type: 'receipt', date: r.receipt_date, desc: r.challan_no ? `Challan: ${r.challan_no}` : "", qty: r.receipt_qty, loss: r.process_loss, id: r.id });
     });
     
     return rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -506,14 +536,36 @@ export function JobWorkOutPage() {
               onChange={(e) => setChallanDate(e.target.value)}
             />
             <TextField
+              label="Challan Number"
+              fullWidth
+              value={sentChallanNo}
+              onChange={(e) => setSentChallanNo(e.target.value)}
+            />
+            <TextField
               label="Item Description (DESP)"
               fullWidth
               placeholder="e.g. COPPER SCRAP TO VENDOR"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Gross Weight (kg)"
+                type="number"
+                fullWidth
+                value={sentGross || ""}
+                onChange={(e) => setSentGross(Number(e.target.value))}
+              />
+              <TextField
+                label="Tare Weight (kg)"
+                type="number"
+                fullWidth
+                value={sentTare || ""}
+                onChange={(e) => setSentTare(Number(e.target.value))}
+              />
+            </Stack>
             <TextField
-              label="Quantity Sent (QTY)"
+              label="Net Quantity Sent (QTY)"
               type="number"
               fullWidth
               value={qty || ""}
@@ -566,7 +618,29 @@ export function JobWorkOutPage() {
               onChange={(e) => setReceiptDate(e.target.value)}
             />
             <TextField
-              label="Receipt Weight (kg)"
+              label="Challan Number"
+              fullWidth
+              value={receiptChallanNo}
+              onChange={(e) => setReceiptChallanNo(e.target.value)}
+            />
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Gross Weight (kg)"
+                type="number"
+                fullWidth
+                value={receiptGross || ""}
+                onChange={(e) => setReceiptGross(Number(e.target.value))}
+              />
+              <TextField
+                label="Tare Weight (kg)"
+                type="number"
+                fullWidth
+                value={receiptTare || ""}
+                onChange={(e) => setReceiptTare(Number(e.target.value))}
+              />
+            </Stack>
+            <TextField
+              label="Net Receipt Weight (kg)"
               type="number"
               fullWidth
               value={receiptQty || ""}

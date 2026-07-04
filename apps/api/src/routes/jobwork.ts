@@ -8,32 +8,44 @@ const CreateClientBody = z.object({
 
 const CreateInwardBody = z.object({
   client_id: z.coerce.number().int().positive(),
+  challan_no: z.string().optional(),
   challan_date: z.string().nonempty(),
   description: z.string().nonempty(),
   qty: z.coerce.number().min(0),
   short_qty: z.coerce.number().min(0).default(0),
+  gross_weight: z.coerce.number().min(0).default(0),
+  tare_weight: z.coerce.number().min(0).default(0),
 });
 
 const CreateOutwardBody = z.object({
   client_id: z.coerce.number().int().positive(),
+  challan_no: z.string().optional(),
   dispatch_date: z.string().nonempty(),
   dispatch_qty: z.coerce.number().min(0),
   process_loss: z.coerce.number().min(0).default(0),
+  gross_weight: z.coerce.number().min(0).default(0),
+  tare_weight: z.coerce.number().min(0).default(0),
 });
 
 const CreateOutSentBody = z.object({
   client_id: z.coerce.number().int().positive(),
+  challan_no: z.string().optional(),
   challan_date: z.string().nonempty(),
   description: z.string().nonempty(),
   qty: z.coerce.number().min(0),
   short_qty: z.coerce.number().min(0).default(0),
+  gross_weight: z.coerce.number().min(0).default(0),
+  tare_weight: z.coerce.number().min(0).default(0),
 });
 
 const CreateOutReceiptBody = z.object({
   client_id: z.coerce.number().int().positive(),
+  challan_no: z.string().optional(),
   receipt_date: z.string().nonempty(),
   receipt_qty: z.coerce.number().min(0),
   process_loss: z.coerce.number().min(0).default(0),
+  gross_weight: z.coerce.number().min(0).default(0),
+  tare_weight: z.coerce.number().min(0).default(0),
 });
 
 export async function registerJobWorkRoutes(app: FastifyInstance, opts: { db: Db }) {
@@ -90,8 +102,8 @@ export async function registerJobWorkRoutes(app: FastifyInstance, opts: { db: Db
   app.post("/jobwork/inward", async (req) => {
     const body = CreateInwardBody.parse(req.body);
     const stmt = db.prepare(`
-      INSERT INTO job_work_inward (client_id, challan_date, description, qty, short_qty)
-      VALUES (@client_id, @challan_date, @description, @qty, @short_qty)
+      INSERT INTO job_work_inward (client_id, challan_no, challan_date, description, qty, short_qty, gross_weight, tare_weight)
+      VALUES (@client_id, @challan_no, @challan_date, @description, @qty, @short_qty, @gross_weight, @tare_weight)
     `);
     const info = stmt.run(body);
     return { data: { id: Number(info.lastInsertRowid) } };
@@ -100,8 +112,8 @@ export async function registerJobWorkRoutes(app: FastifyInstance, opts: { db: Db
   app.post("/jobwork/outward", async (req) => {
     const body = CreateOutwardBody.parse(req.body);
     const stmt = db.prepare(`
-      INSERT INTO job_work_outward (client_id, dispatch_date, dispatch_qty, process_loss)
-      VALUES (@client_id, @dispatch_date, @dispatch_qty, @process_loss)
+      INSERT INTO job_work_outward (client_id, challan_no, dispatch_date, dispatch_qty, process_loss, gross_weight, tare_weight)
+      VALUES (@client_id, @challan_no, @dispatch_date, @dispatch_qty, @process_loss, @gross_weight, @tare_weight)
     `);
     const info = stmt.run(body);
     return { data: { id: Number(info.lastInsertRowid) } };
@@ -151,8 +163,8 @@ export async function registerJobWorkRoutes(app: FastifyInstance, opts: { db: Db
   app.post("/jobwork-out/sent", async (req) => {
     const body = CreateOutSentBody.parse(req.body);
     const stmt = db.prepare(`
-      INSERT INTO job_work_out_sent (client_id, challan_date, description, qty, short_qty)
-      VALUES (@client_id, @challan_date, @description, @qty, @short_qty)
+      INSERT INTO job_work_out_sent (client_id, challan_no, challan_date, description, qty, short_qty, gross_weight, tare_weight)
+      VALUES (@client_id, @challan_no, @challan_date, @description, @qty, @short_qty, @gross_weight, @tare_weight)
     `);
     const info = stmt.run(body);
     return { data: { id: Number(info.lastInsertRowid) } };
@@ -161,8 +173,8 @@ export async function registerJobWorkRoutes(app: FastifyInstance, opts: { db: Db
   app.post("/jobwork-out/receipt", async (req) => {
     const body = CreateOutReceiptBody.parse(req.body);
     const stmt = db.prepare(`
-      INSERT INTO job_work_out_receipt (client_id, receipt_date, receipt_qty, process_loss)
-      VALUES (@client_id, @receipt_date, @receipt_qty, @process_loss)
+      INSERT INTO job_work_out_receipt (client_id, challan_no, receipt_date, receipt_qty, process_loss, gross_weight, tare_weight)
+      VALUES (@client_id, @challan_no, @receipt_date, @receipt_qty, @process_loss, @gross_weight, @tare_weight)
     `);
     const info = stmt.run(body);
     return { data: { id: Number(info.lastInsertRowid) } };

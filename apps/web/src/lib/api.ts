@@ -105,6 +105,7 @@ export type OrderRow = {
 
 export async function fetchOrders(params?: {
   q?: string;
+  search_attr?: string;
   status?: string;
   from?: string;
   to?: string;
@@ -625,19 +626,25 @@ export async function createJobWorkClient(name: string) {
 export type JobWorkInward = {
   id: number;
   client_id: number;
+  challan_no: string | null;
   challan_date: string;
   description: string;
   qty: number;
   short_qty: number;
+  gross_weight: number;
+  tare_weight: number;
   created_at: string;
 };
 
 export type JobWorkOutward = {
   id: number;
   client_id: number;
+  challan_no: string | null;
   dispatch_date: string;
   dispatch_qty: number;
   process_loss: number;
+  gross_weight: number;
+  tare_weight: number;
   created_at: string;
 };
 
@@ -655,12 +662,12 @@ export async function fetchJobWorkList() {
   return res.data.data;
 }
 
-export async function createJobWorkInward(body: { client_id: number; challan_date: string; description: string; qty: number; short_qty?: number }) {
+export async function createJobWorkInward(body: { client_id: number; challan_no?: string; challan_date: string; description: string; qty: number; short_qty?: number; gross_weight?: number; tare_weight?: number }) {
   const res = await api.post<{ data: { id: number } }>("/jobwork/inward", body);
   return res.data.data;
 }
 
-export async function createJobWorkOutward(body: { client_id: number; dispatch_date: string; dispatch_qty: number; process_loss?: number }) {
+export async function createJobWorkOutward(body: { client_id: number; challan_no?: string; dispatch_date: string; dispatch_qty: number; process_loss?: number; gross_weight?: number; tare_weight?: number }) {
   const res = await api.post<{ data: { id: number } }>("/jobwork/outward", body);
   return res.data.data;
 }
@@ -681,19 +688,25 @@ export async function mergeInventoryItems(body: { sourceName: string; targetName
 export type JobWorkOutSent = {
   id: number;
   client_id: number;
+  challan_no: string | null;
   challan_date: string;
   description: string;
   qty: number;
   short_qty: number;
+  gross_weight: number;
+  tare_weight: number;
   created_at: string;
 };
 
 export type JobWorkOutReceipt = {
   id: number;
   client_id: number;
+  challan_no: string | null;
   receipt_date: string;
   receipt_qty: number;
   process_loss: number;
+  gross_weight: number;
+  tare_weight: number;
   created_at: string;
 };
 
@@ -711,12 +724,12 @@ export async function fetchJobWorkOutList() {
   return res.data.data;
 }
 
-export async function createJobWorkOutSent(body: { client_id: number; challan_date: string; description: string; qty: number; short_qty?: number }) {
+export async function createJobWorkOutSent(body: { client_id: number; challan_no?: string; challan_date: string; description: string; qty: number; short_qty?: number; gross_weight?: number; tare_weight?: number }) {
   const res = await api.post<{ data: { id: number } }>("/jobwork-out/sent", body);
   return res.data.data;
 }
 
-export async function createJobWorkOutReceipt(body: { client_id: number; receipt_date: string; receipt_qty: number; process_loss?: number }) {
+export async function createJobWorkOutReceipt(body: { client_id: number; challan_no?: string; receipt_date: string; receipt_qty: number; process_loss?: number; gross_weight?: number; tare_weight?: number }) {
   const res = await api.post<{ data: { id: number } }>("/jobwork-out/receipt", body);
   return res.data.data;
 }

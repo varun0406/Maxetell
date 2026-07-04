@@ -4,10 +4,11 @@ import type { Db } from "../db.js";
 
 const ListOrdersQuery = z.object({
   q: z.string().optional(),
+  search_attr: z.string().optional(),
   status: z.enum(["All", "Pending", "Partial", "Paid", "NoInvoice"]).default("All"),
   from: z.string().optional(),
   to: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(500).default(200),
+  limit: z.coerce.number().int().min(1).max(10000).default(10000),
   offset: z.coerce.number().int().min(0).default(0),
 });
 
@@ -124,10 +125,15 @@ function buildListSql(params: z.infer<typeof ListOrdersQuery>) {
   const binds: Record<string, unknown> = {};
 
   if (params.q) {
-    where.push(
-      `(wo_no LIKE @like OR client_name LIKE @like OR invoice_no LIKE @like OR or_no LIKE @like OR item LIKE @like OR client_po_no LIKE @like)`,
-    );
-    binds.like = `%${params.q}%`;
+    if (params.search_attr && params.search_attr !== "All") {
+      where.push(`${params.search_attr} LIKE @q_exact`);
+      binds.q_exact = params.q.trim();
+    } else {
+      where.push(
+        `(wo_no LIKE @like OR client_name LIKE @like OR invoice_no LIKE @like OR or_no LIKE @like OR item LIKE @like OR client_po_no LIKE @like)`,
+      );
+      binds.like = `%${params.q}%`;
+    }
   }
 
   if (params.status !== "All") {

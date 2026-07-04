@@ -15,6 +15,8 @@ import {
   Typography,
   Alert,
   Divider,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
@@ -87,6 +89,7 @@ export function OrdersPage() {
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [products, setProducts] = useState<MasterProduct[]>([]);
   const [q, setQ] = useState("");
+  const [searchAttr, setSearchAttr] = useState("All");
   const [hideCompleted, setHideCompleted] = useState(true);
   const [selected, setSelected] = useState<OrderRow | null>(null);
   const [saving, setSaving] = useState(false);
@@ -111,7 +114,7 @@ export function OrdersPage() {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchOrders({ q: q.trim() || undefined })
+    fetchOrders({ q: q.trim() || undefined, search_attr: searchAttr })
       .then((data) => {
         if (!alive) return;
         setRows(data);
@@ -122,7 +125,7 @@ export function OrdersPage() {
     return () => {
       alive = false;
     };
-  }, [q]);
+  }, [q, searchAttr]);
 
   useEffect(() => {
     fetchProducts().then(setProducts).catch(() => setProducts([]));
@@ -310,7 +313,7 @@ export function OrdersPage() {
         setSuccessMsg(`Successfully processed split configurations! Affected orders count: ${res.affectedOrdersCount}`);
         
         // Refresh orders list
-        const updatedOrders = await fetchOrders({ q: q.trim() || undefined });
+        const updatedOrders = await fetchOrders({ q: q.trim() || undefined, search_attr: searchAttr });
         setRows(updatedOrders);
       } catch (err: any) {
         setErr(err.message || "Failed to process CSV file.");
@@ -454,23 +457,38 @@ export function OrdersPage() {
         </Stack>
       </Stack>
 
-      <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-        <TextField
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search WO / Client PO / client / invoice / OR…"
-          size="small"
-          fullWidth
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-        />
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
+        <Stack direction="row" spacing={1} sx={{ flexGrow: 1 }}>
+          <Select
+            size="small"
+            value={searchAttr}
+            onChange={(e) => setSearchAttr(e.target.value)}
+            sx={{ minWidth: 150, bgcolor: "background.paper" }}
+          >
+            <MenuItem value="All">All fields</MenuItem>
+            <MenuItem value="wo_no">WO No</MenuItem>
+            <MenuItem value="client_po_no">Client PO</MenuItem>
+            <MenuItem value="client_name">Client Name</MenuItem>
+            <MenuItem value="item">Product</MenuItem>
+            <MenuItem value="invoice_no">Invoice No</MenuItem>
+          </Select>
+          <TextField
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={searchAttr === "All" ? "Search WO / Client PO / client / invoice…" : `Search exact ${searchAttr.replace('_', ' ')}...`}
+            size="small"
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Stack>
         <FormControlLabel
-          sx={{ whiteSpace: "nowrap", ml: 1 }}
+          sx={{ whiteSpace: "nowrap", ml: { sm: 1 } }}
           control={<Switch checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} />}
           label="Hide completed"
         />

@@ -17,6 +17,8 @@ import {
   Tabs,
   TextField,
   Typography,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -52,6 +54,7 @@ export function PurchasePage() {
 
   const [rows, setRows] = useState<PurchaseLedgerRow[]>([]);
   const [q, setQ] = useState("");
+  const [searchAttr, setSearchAttr] = useState("All");
   const [hideCompleted, setHideCompleted] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -107,15 +110,25 @@ export function PurchasePage() {
     }
     if (q.trim()) {
       const searchVal = q.toLowerCase();
-      list = list.filter((r) => 
-        (r.client_po_no && r.client_po_no.toLowerCase().includes(searchVal)) ||
-        (r.po_no && r.po_no.toLowerCase().includes(searchVal)) ||
-        (r.supplier_name && r.supplier_name.toLowerCase().includes(searchVal)) ||
-        (r.item && r.item.toLowerCase().includes(searchVal))
-      );
+      if (searchAttr === "All") {
+        list = list.filter((r) => 
+          (r.client_po_no && r.client_po_no.toLowerCase().includes(searchVal)) ||
+          (r.po_no && r.po_no.toLowerCase().includes(searchVal)) ||
+          (r.supplier_name && r.supplier_name.toLowerCase().includes(searchVal)) ||
+          (r.item && r.item.toLowerCase().includes(searchVal))
+        );
+      } else {
+        list = list.filter((r) => {
+          const val = r[searchAttr as keyof PurchaseLedgerRow];
+          if (typeof val === 'string') {
+            return val.toLowerCase().includes(searchVal);
+          }
+          return false;
+        });
+      }
     }
     return list;
-  }, [rows, hideCompleted, q]);
+  }, [rows, hideCompleted, q, searchAttr]);
 
   const loadLedger = useCallback(() => {
     setLoading(true);
@@ -565,11 +578,23 @@ export function PurchasePage() {
         <CardContent>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }} justifyContent="space-between" sx={{ mb: 1.5 }}>
             <Typography fontWeight={800}>Purchase orders ledger</Typography>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ flexGrow: { xs: 1, sm: 0 }, minWidth: { sm: 350 } }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexGrow: { xs: 1, sm: 0 }, minWidth: { sm: 400 } }}>
+              <Select
+                size="small"
+                value={searchAttr}
+                onChange={(e) => setSearchAttr(e.target.value)}
+                sx={{ minWidth: 140, bgcolor: "background.paper" }}
+              >
+                <MenuItem value="All">All fields</MenuItem>
+                <MenuItem value="po_no">PO No</MenuItem>
+                <MenuItem value="client_po_no">Client PO</MenuItem>
+                <MenuItem value="supplier_name">Supplier Name</MenuItem>
+                <MenuItem value="item">Product</MenuItem>
+              </Select>
               <TextField
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search Client PO / PO / Supplier…"
+                placeholder={searchAttr === "All" ? "Search Client PO / PO / Supplier…" : `Search ${searchAttr.replace('_', ' ')}...`}
                 size="small"
                 fullWidth
                 InputProps={{
@@ -581,7 +606,7 @@ export function PurchasePage() {
                 }}
               />
               <FormControlLabel
-                sx={{ whiteSpace: "nowrap" }}
+                sx={{ whiteSpace: "nowrap", ml: 1 }}
                 control={<Switch checked={hideCompleted} onChange={(e) => setHideCompleted(e.target.checked)} />}
                 label="Hide completed"
               />

@@ -223,6 +223,7 @@ CREATE TABLE IF NOT EXISTS job_work_out_receipt (
 );
 `);
   migrateSalesReturns(db);
+  migrateJobWorkFields(db);
 }
 
 function migrateSalesReturns(db: Db) {
@@ -530,6 +531,21 @@ function migrateJobWorkOut(db: Db) {
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
+  }
+}
+
+function migrateJobWorkFields(db: Db) {
+  const tables = ['job_work_inward', 'job_work_outward', 'job_work_out_sent', 'job_work_out_receipt'];
+  for (const table of tables) {
+    if (!columnExists(db, table, "challan_no")) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN challan_no TEXT;`);
+    }
+    if (!columnExists(db, table, "gross_weight")) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN gross_weight REAL DEFAULT 0;`);
+    }
+    if (!columnExists(db, table, "tare_weight")) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN tare_weight REAL DEFAULT 0;`);
+    }
   }
 }
 

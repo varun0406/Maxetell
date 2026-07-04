@@ -55,18 +55,36 @@ export function JobWorkPage() {
 
   // Inward Form
   const [inwardClientId, setInwardClientId] = useState<number | "">("");
+  const [inwardChallanNo, setInwardChallanNo] = useState("");
   const [challanDate, setChallanDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [description, setDescription] = useState("");
+  const [inwardGross, setInwardGross] = useState<number>(0);
+  const [inwardTare, setInwardTare] = useState<number>(0);
   const [qty, setQty] = useState<number>(0);
   const [shortQty, setShortQty] = useState<number>(0);
   const [savingInward, setSavingInward] = useState(false);
 
+  useEffect(() => {
+    if (inwardGross > 0 || inwardTare > 0) {
+      setQty(Math.max(0, inwardGross - inwardTare));
+    }
+  }, [inwardGross, inwardTare]);
+
   // Outward Form
   const [outwardClientId, setOutwardClientId] = useState<number | "">("");
+  const [outwardChallanNo, setOutwardChallanNo] = useState("");
   const [dispatchDate, setDispatchDate] = useState(dayjs().format("YYYY-MM-DD"));
+  const [outwardGross, setOutwardGross] = useState<number>(0);
+  const [outwardTare, setOutwardTare] = useState<number>(0);
   const [dispatchQty, setDispatchQty] = useState<number>(0);
   const [processLoss, setProcessLoss] = useState<number>(0);
   const [savingOutward, setSavingOutward] = useState(false);
+
+  useEffect(() => {
+    if (outwardGross > 0 || outwardTare > 0) {
+      setDispatchQty(Math.max(0, outwardGross - outwardTare));
+    }
+  }, [outwardGross, outwardTare]);
 
   async function loadData() {
     setLoading(true);
@@ -141,13 +159,19 @@ export function JobWorkPage() {
     try {
       await createJobWorkInward({
         client_id: Number(inwardClientId),
+        challan_no: inwardChallanNo,
         challan_date: challanDate,
         description,
         qty,
         short_qty: shortQty,
+        gross_weight: inwardGross,
+        tare_weight: inwardTare,
       });
       setInwardOpen(false);
+      setInwardChallanNo("");
       setDescription("");
+      setInwardGross(0);
+      setInwardTare(0);
       setQty(0);
       setShortQty(0);
       await loadData();
@@ -164,11 +188,17 @@ export function JobWorkPage() {
     try {
       await createJobWorkOutward({
         client_id: Number(outwardClientId),
+        challan_no: outwardChallanNo,
         dispatch_date: dispatchDate,
         dispatch_qty: dispatchQty,
         process_loss: processLoss,
+        gross_weight: outwardGross,
+        tare_weight: outwardTare,
       });
       setOutwardOpen(false);
+      setOutwardChallanNo("");
+      setOutwardGross(0);
+      setOutwardTare(0);
       setDispatchQty(0);
       setProcessLoss(0);
       await loadData();
@@ -218,10 +248,10 @@ export function JobWorkPage() {
     
     const rows: Row[] = [];
     selectedClientLedger.inwards.forEach(i => {
-      rows.push({ type: 'inward', date: i.challan_date, desc: i.description, qty: i.qty, short: i.short_qty, id: i.id });
+      rows.push({ type: 'inward', date: i.challan_date, desc: i.description + (i.challan_no ? ` (Challan: ${i.challan_no})` : ""), qty: i.qty, short: i.short_qty, id: i.id });
     });
     selectedClientLedger.outwards.forEach(o => {
-      rows.push({ type: 'outward', date: o.dispatch_date, qty: o.dispatch_qty, loss: o.process_loss, id: o.id });
+      rows.push({ type: 'outward', date: o.dispatch_date, desc: o.challan_no ? `Challan: ${o.challan_no}` : "", qty: o.dispatch_qty, loss: o.process_loss, id: o.id });
     });
     
     return rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -506,14 +536,36 @@ export function JobWorkPage() {
               onChange={(e) => setChallanDate(e.target.value)}
             />
             <TextField
+              label="Challan Number"
+              fullWidth
+              value={inwardChallanNo}
+              onChange={(e) => setInwardChallanNo(e.target.value)}
+            />
+            <TextField
               label="Item Description (DESP)"
               fullWidth
               placeholder="e.g. COPPER SCRAP-CABLE"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Gross Weight (kg)"
+                type="number"
+                fullWidth
+                value={inwardGross || ""}
+                onChange={(e) => setInwardGross(Number(e.target.value))}
+              />
+              <TextField
+                label="Tare Weight (kg)"
+                type="number"
+                fullWidth
+                value={inwardTare || ""}
+                onChange={(e) => setInwardTare(Number(e.target.value))}
+              />
+            </Stack>
             <TextField
-              label="Quantity Received (QTY)"
+              label="Net Quantity Received (QTY)"
               type="number"
               fullWidth
               value={qty || ""}
@@ -566,7 +618,29 @@ export function JobWorkPage() {
               onChange={(e) => setDispatchDate(e.target.value)}
             />
             <TextField
-              label="Dispatch Weight (kg)"
+              label="Challan Number"
+              fullWidth
+              value={outwardChallanNo}
+              onChange={(e) => setOutwardChallanNo(e.target.value)}
+            />
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Gross Weight (kg)"
+                type="number"
+                fullWidth
+                value={outwardGross || ""}
+                onChange={(e) => setOutwardGross(Number(e.target.value))}
+              />
+              <TextField
+                label="Tare Weight (kg)"
+                type="number"
+                fullWidth
+                value={outwardTare || ""}
+                onChange={(e) => setOutwardTare(Number(e.target.value))}
+              />
+            </Stack>
+            <TextField
+              label="Net Dispatch Weight (kg)"
               type="number"
               fullWidth
               value={dispatchQty || ""}
