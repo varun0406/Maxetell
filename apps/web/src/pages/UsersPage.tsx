@@ -77,6 +77,7 @@ export function UsersPage() {
 
   async function remove(id: number) {
     if (!window.confirm("Delete this user?")) return;
+    if (!window.confirm("Are you REALLY sure?")) return;
     setSaving(true);
     setErr(null);
     try {

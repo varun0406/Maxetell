@@ -84,6 +84,7 @@ export type OrderRow = {
   order_kgs: number;
   order_pcs: number;
   dispatch_weight: number;
+  packing_weight: number;
   dispatch_pcs: number;
   balance_kgs: number;
   balance_pcs: number;

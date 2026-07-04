@@ -620,6 +620,8 @@ export function ReturnsPage() {
                       size="small"
                       color="error"
                       onClick={async () => {
+                        if (!window.confirm("Are you sure you want to delete this sales return?")) return;
+                        if (!window.confirm("Are you REALLY sure?")) return;
                         setSaving(true);
                         try {
                           await deleteSalesReturn(r.id);
@@ -676,6 +678,8 @@ export function ReturnsPage() {
                       size="small"
                       color="error"
                       onClick={async () => {
+                        if (!window.confirm("Are you sure you want to delete this purchase return?")) return;
+                        if (!window.confirm("Are you REALLY sure?")) return;
                         setSaving(true);
                         try {
                           await deletePurchaseReturn(r.id);

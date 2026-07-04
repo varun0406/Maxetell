@@ -167,6 +167,7 @@ export function OrdersPage() {
     const pending = sum(sourceRows.map((r) => Math.max(0, r.balance_kgs)));
     const dispatchKgs = sum(sourceRows.map((r) => r.dispatch_weight));
     const dispatchPcsSum = sum(sourceRows.map((r) => r.dispatch_pcs || 0));
+    const packingWeightSum = sum(sourceRows.map((r) => r.packing_weight || 0));
     const balanceKgs = sum(sourceRows.map((r) => Math.max(0, r.balance_kgs)));
     const balancePcs = sum(sourceRows.map((r) => Math.max(0, r.balance_pcs || 0)));
     const invoiceTotal = sumOncePerOrder(sourceRows, (r) => r.invoice_total);
@@ -181,6 +182,7 @@ export function OrdersPage() {
       orderKgs,
       orderPcs,
       dispatchKgs,
+      packingWeightSum,
       dispatchPcsSum,
       balanceKgs,
       balancePcs,
@@ -506,6 +508,7 @@ export function OrdersPage() {
         <SummaryChip label="Order Kgs" value={kg(header.orderKgs)} />
         <SummaryChip label="Order Pcs" value={pcs(header.orderPcs)} />
         <SummaryChip label="Dispatch" value={kg(header.dispatchKgs)} />
+        <SummaryChip label="Packing" value={kg(header.packingWeightSum)} />
         <SummaryChip label="Dispatch Pcs" value={pcs(header.dispatchPcsSum)} />
         <SummaryChip
           label="Balance (kg)"
@@ -560,8 +563,8 @@ export function OrdersPage() {
             sx={{
               display: "grid",
               gridTemplateColumns:
-                "120px 120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
-              minWidth: 2260,
+                "120px 120px 120px 220px 140px 160px 90px 110px 90px 110px 100px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
+              minWidth: 2360,
               gap: 0,
               borderBottom: "1px solid rgba(15, 23, 42, 0.08)",
               position: "sticky",
@@ -580,6 +583,7 @@ export function OrdersPage() {
               "Order Kgs",
               "Order Pcs",
               "Dispatch",
+              "Packing",
               "Dispatch Pcs",
               "Balance",
               "Balance Pcs",
@@ -607,8 +611,8 @@ export function OrdersPage() {
                 sx={{
                   display: "grid",
                   gridTemplateColumns:
-                    "120px 120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
-                  minWidth: 2260,
+                    "120px 120px 120px 220px 140px 160px 90px 110px 90px 110px 100px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
+                  minWidth: 2360,
                   borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
                   cursor: "pointer",
                   "&:hover": { background: "rgba(37, 99, 235, 0.04)" },
@@ -627,6 +631,7 @@ export function OrdersPage() {
                 <Cell>{kg(r.order_kgs)}</Cell>
                 <Cell>{pcs(r.order_pcs)}</Cell>
                 <Cell>{kg(r.dispatch_weight)}</Cell>
+                <Cell>{kg(r.packing_weight)}</Cell>
                 <Cell>{pcs(r.dispatch_pcs)}</Cell>
                 <Cell highlight={pending ? "warning" : undefined}>{kg(r.balance_kgs)}</Cell>
                 <Cell highlight={pending ? "warning" : undefined}>{pcs(r.balance_pcs)}</Cell>
@@ -658,8 +663,8 @@ export function OrdersPage() {
             sx={{
               display: "grid",
               gridTemplateColumns:
-                "120px 120px 120px 220px 140px 160px 90px 110px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
-              minWidth: 2260,
+                "120px 120px 120px 220px 140px 160px 90px 110px 90px 110px 100px 90px 110px 90px 110px 100px 100px 110px 100px 110px 110px 160px",
+              minWidth: 2360,
               borderTop: "2px solid rgba(15, 23, 42, 0.12)",
               background: "rgba(15, 23, 42, 0.02)",
               position: "sticky",
@@ -677,6 +682,7 @@ export function OrdersPage() {
             <Cell strong>{kg(sum(shownRows.map((r) => r.order_kgs)))}</Cell>
             <Cell strong>{pcs(sum(shownRows.map((r) => r.order_pcs || 0)))}</Cell>
             <Cell strong>{kg(sum(shownRows.map((r) => r.dispatch_weight)))}</Cell>
+            <Cell strong>{kg(sum(shownRows.map((r) => r.packing_weight || 0)))}</Cell>
             <Cell strong>{pcs(sum(shownRows.map((r) => r.dispatch_pcs || 0)))}</Cell>
             <Cell strong highlight={sum(shownRows.map((r) => Math.max(0, r.balance_kgs))) > 0.0001 ? "warning" : undefined}>
               {kg(sum(shownRows.map((r) => Math.max(0, r.balance_kgs))))}
@@ -718,15 +724,19 @@ export function OrdersPage() {
               </Box>
               <Stack direction="row" spacing={1}>
                 <IconButton color="error" size="small" onClick={async () => {
-                  setSaving(true);
-                  try {
-                    await deleteOrder(selected.order_id);
-                    setRows(prev => prev.filter(r => r.order_id !== selected.order_id));
-                    setSelected(null);
-                  } catch (e: unknown) {
-                    alert(e instanceof Error ? e.message : "Failed to delete");
-                  } finally {
-                    setSaving(false);
+                  if (window.confirm("Are you sure you want to delete this order?")) {
+                    if (window.confirm("Are you REALLY sure? This will delete the order and all its lines forever.")) {
+                      setSaving(true);
+                      try {
+                        await deleteOrder(selected.order_id);
+                        setRows(prev => prev.filter(r => r.order_id !== selected.order_id));
+                        setSelected(null);
+                      } catch (e: unknown) {
+                        alert(e instanceof Error ? e.message : "Failed to delete");
+                      } finally {
+                        setSaving(false);
+                      }
+                    }
                   }
                 }}>
                   <DeleteOutlineIcon />

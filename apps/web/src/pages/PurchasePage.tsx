@@ -287,6 +287,8 @@ export function PurchasePage() {
 
   async function removeReceiptLine(id: number) {
     if (!drawerPo) return;
+    if (!window.confirm("Are you sure you want to delete this receipt?")) return;
+    if (!window.confirm("Are you REALLY sure? This will delete the receipt permanently.")) return;
     setSaving(true);
     setErr(null);
     try {
@@ -718,15 +720,19 @@ export function PurchasePage() {
               <Typography fontWeight={900}>PO {drawerPo.po_no ?? drawerPo.id}</Typography>
               <Stack direction="row" spacing={1}>
                 <IconButton color="error" size="small" onClick={async () => {
-                  setSaving(true);
-                  try {
-                    await deletePurchase(drawerPo.id);
-                    setRows(prev => prev.filter(r => r.id !== drawerPo.id));
-                    setDrawerPo(null);
-                  } catch (e: unknown) {
-                    alert(e instanceof Error ? e.message : "Failed to delete");
-                  } finally {
-                    setSaving(false);
+                  if (window.confirm("Are you sure you want to delete this purchase order?")) {
+                    if (window.confirm("Are you REALLY sure? This will delete the PO and all its receipts permanently.")) {
+                      setSaving(true);
+                      try {
+                        await deletePurchase(drawerPo.id);
+                        setRows(prev => prev.filter(r => r.id !== drawerPo.id));
+                        setDrawerPo(null);
+                      } catch (e: unknown) {
+                        alert(e instanceof Error ? e.message : "Failed to delete");
+                      } finally {
+                        setSaving(false);
+                      }
+                    }
                   }
                 }}>
                   <DeleteOutlineIcon />

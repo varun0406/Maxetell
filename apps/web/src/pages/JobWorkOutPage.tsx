@@ -211,6 +211,7 @@ export function JobWorkOutPage() {
 
   async function handleDeleteSent(id: number) {
     if (!window.confirm("Are you sure you want to delete this outward entry?")) return;
+    if (!window.confirm("Are you REALLY sure?")) return;
     try {
       await deleteJobWorkOutSent(id);
       await loadData();
@@ -221,6 +222,7 @@ export function JobWorkOutPage() {
 
   async function handleDeleteReceipt(id: number) {
     if (!window.confirm("Are you sure you want to delete this receipt entry?")) return;
+    if (!window.confirm("Are you REALLY sure?")) return;
     try {
       await deleteJobWorkOutReceipt(id);
       await loadData();

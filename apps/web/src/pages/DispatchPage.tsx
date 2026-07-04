@@ -485,6 +485,7 @@ export function DispatchPage() {
                       sx={{ textTransform: "none", py: 0.25, px: 1, fontSize: "0.75rem" }}
                       onClick={async () => {
                         if (window.confirm("Are you sure you want to delete this dispatch entry?")) {
+                          if (!window.confirm("Are you REALLY sure?")) return;
                           try {
                             const updated = await deleteDispatch(e.id);
                             setOrders((prev) => {

@@ -291,6 +291,7 @@ SELECT
   oli.order_kgs,
   oli.order_pcs,
   COALESCE((SELECT SUM(de.dispatch_weight) FROM dispatch_entries de WHERE de.order_line_item_id = oli.id), 0) AS dispatch_weight,
+  COALESCE((SELECT SUM(de.packing_weight) FROM dispatch_entries de WHERE de.order_line_item_id = oli.id), 0) AS packing_weight,
   COALESCE((SELECT SUM(de.dispatch_pcs) FROM dispatch_entries de WHERE de.order_line_item_id = oli.id), 0) AS dispatch_pcs,
   (
     oli.order_kgs

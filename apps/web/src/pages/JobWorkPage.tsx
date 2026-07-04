@@ -211,6 +211,7 @@ export function JobWorkPage() {
 
   async function handleDeleteInward(id: number) {
     if (!window.confirm("Are you sure you want to delete this inward entry?")) return;
+    if (!window.confirm("Are you REALLY sure?")) return;
     try {
       await deleteJobWorkInward(id);
       await loadData();
@@ -221,6 +222,7 @@ export function JobWorkPage() {
 
   async function handleDeleteOutward(id: number) {
     if (!window.confirm("Are you sure you want to delete this dispatch entry?")) return;
+    if (!window.confirm("Are you REALLY sure?")) return;
     try {
       await deleteJobWorkOutward(id);
       await loadData();
