@@ -40,6 +40,7 @@ import {
 import type { MasterProduct, OrderRow, SplitImportRow } from "../lib/api";
 import type { DispatchEntry, PaymentEntry } from "../lib/api";
 import { exportToCsv } from "../lib/export";
+import { CsvImportUpdate } from "../components/CsvImportUpdate";
 
 function money(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -450,9 +451,40 @@ export function OrdersPage() {
               onChange={handleCsvUpload}
             />
           </Button>
-          <Button variant="outlined" onClick={() => exportToCsv("orders", rows)}>
-            Export to Excel
-          </Button>
+          <Button variant="outlined" size="small" onClick={() => {
+          const data = shownRows.map((r) => ({
+            ID: r.id,
+            "Order ID": r.order_id,
+            "WO No": r.wo_no,
+            "Client PO": r.client_po_no,
+            Client: r.client_name,
+            Date: r.order_date,
+            Product: r.item,
+            Size: r.size,
+            Grade: r.grade,
+            "Order Kgs": r.order_kgs,
+            "Order Pcs": r.order_pcs,
+            "Dispatch Kgs": r.dispatch_weight,
+            "Packing": r.packing_weight,
+            "Dispatch Pcs": r.dispatch_pcs,
+            "Balance Kgs": r.balance_kgs,
+            "Balance Pcs": r.balance_pcs,
+            "Invoice No": r.invoice_no,
+            Remarks: r.remarks,
+          }));
+          exportToCsv("orders", data);
+        }}>
+          Export to Excel
+        </Button>
+        <CsvImportUpdate 
+          table="order_line_items" 
+          buttonText="Import to Update (Lines)"
+          onSuccess={async (msg) => {
+            alert(msg);
+            const updatedOrders = await fetchOrders({ q: q.trim() || undefined, search_attr: searchAttr });
+            setRows(updatedOrders);
+          }} 
+        />
           <Button variant="contained" component={RouterLink} to="/orders/new">
             Add Order
           </Button>

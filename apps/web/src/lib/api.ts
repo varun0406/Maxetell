@@ -766,3 +766,8 @@ export async function importSyncReturns(body: {
   const res = await api.post("/sync/import", body);
   return res.data;
 }
+
+export async function updateFromCsv(table: string, rows: Record<string, any>[]) {
+  const res = await api.post<{ success: boolean; updatedCount: number }>("/sync/csv-update", { table, rows });
+  return res.data;
+}

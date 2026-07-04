@@ -18,6 +18,7 @@ import dayjs from "dayjs";
 import { createDispatchForLine, deleteDispatch, fetchDispatch, fetchOrders } from "../lib/api";
 import type { DispatchEntry, OrderRow } from "../lib/api";
 import { exportToCsv } from "../lib/export";
+import { CsvImportUpdate } from "../components/CsvImportUpdate";
 
 export function DispatchPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -162,9 +163,21 @@ export function DispatchPage() {
         <Typography variant="h5" fontWeight={900}>
           Dispatch Entry
         </Typography>
-        <Button variant="outlined" onClick={() => exportToCsv("dispatch_entries", entries)}>
-          Export to Excel
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" onClick={() => exportToCsv("dispatch_entries", entries)}>
+            Export to Excel
+          </Button>
+          <CsvImportUpdate 
+            table="dispatch_entries" 
+            onSuccess={async (msg) => {
+              alert(msg);
+              if (selectedWO) {
+                const list = await fetchDispatch(selectedWO.order_id);
+                setEntries(list);
+              }
+            }} 
+          />
+        </Stack>
       </Stack>
 
       {err ? (

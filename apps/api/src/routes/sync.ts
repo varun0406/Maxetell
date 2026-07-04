@@ -140,6 +140,62 @@ export async function registerSyncRoutes(app: FastifyInstance, opts: { db: Db })
     return { orders, dispatches, salesReturns, purchases, receipts, purchaseReturns };
   });
 
+  app.post("/sync/csv-update", async (req) => {
+    const body = z.object({
+      table: z.enum(["orders", "order_line_items", "dispatch_entries", "purchase_entries", "purchase_receipts", "sales_returns", "purchase_returns"]),
+      rows: z.array(z.record(z.any()))
+    }).parse(req.body);
+
+    const allowedColumns: Record<string, string[]> = {
+      order_line_items: ["order_kgs", "order_pcs", "bill_rate", "size", "item", "grade", "length_nos"],
+      orders: ["wo_no", "client_po_no", "remarks", "invoice_no", "sales_date", "or_no"],
+      dispatch_entries: ["dispatch_date", "dispatch_weight", "packing_weight", "dispatch_pcs", "bundle_no", "transport", "sales_rate"],
+      purchase_entries: ["po_no", "client_po_no", "purchase_date", "weight", "rate", "bill_no", "transport"],
+      purchase_receipts: ["receipt_date", "weight_received", "note"],
+      sales_returns: ["return_date", "weight", "note", "remarks"],
+      purchase_returns: ["return_date", "weight", "note", "remarks"]
+    };
+
+    const validCols = allowedColumns[body.table];
+    if (!validCols) throw new Error("Invalid table");
+
+    let updatedCount = 0;
+    db.transaction(() => {
+      for (const row of body.rows) {
+        // Handle ID parsing
+        const id = parseInt(row.id || row.ID || row.Id, 10);
+        if (!id || isNaN(id)) continue;
+        
+        const updates: string[] = [];
+        const params: any[] = [];
+        
+        for (const col of validCols) {
+          if (row[col] !== undefined) {
+            updates.push(`${col} = ?`);
+            let val = row[col];
+            if (val === "") val = null;
+            // Parse numbers if applicable, wait sqlite handles it dynamically but let's be careful
+            if (val !== null && !isNaN(Number(val)) && typeof val === "string") {
+              // Only convert if it's strictly a number and not a date or string like "WO-123"
+              if (!val.includes("-") && val.trim() !== "") {
+                 val = Number(val);
+              }
+            }
+            params.push(val);
+          }
+        }
+        
+        if (updates.length > 0) {
+          params.push(id);
+          const stmt = db.prepare(`UPDATE ${body.table} SET ${updates.join(", ")} WHERE id = ?`);
+          const info = stmt.run(...params);
+          if (info.changes > 0) updatedCount++;
+        }
+      }
+    })();
+    return { success: true, updatedCount };
+  });
+
   app.post("/sync/import", async (req) => {
     const { salesReturns, purchaseReturns, dispatches, receipts, newOrders, newPurchases } = ImportSyncBody.parse(req.body);
 

@@ -19,6 +19,7 @@ import {
 import type { PurchaseLedgerRow, PurchaseReturnRow, SalesReturnRow } from "../lib/api";
 import type { OrderRow } from "../lib/api";
 import { exportToCsv } from "../lib/export";
+import { CsvImportUpdate } from "../components/CsvImportUpdate";
 import * as XLSX from "xlsx";
 
 function money(n: number) {
@@ -573,9 +574,19 @@ export function ReturnsPage() {
               <Typography fontWeight={900}>
                 Sales returns history
               </Typography>
-              <Button variant="outlined" size="small" onClick={() => exportToCsv("sales_returns", filteredSalesReturns)}>
-                Export
-              </Button>
+              <Stack direction="row" spacing={1}>
+                <Button variant="outlined" size="small" onClick={() => exportToCsv("sales_returns", filteredSalesReturns)}>
+                  Export
+                </Button>
+                <CsvImportUpdate 
+                  table="sales_returns" 
+                  buttonText="Update"
+                  onSuccess={(msg) => {
+                    alert(msg);
+                    refresh();
+                  }} 
+                />
+              </Stack>
             </Stack>
             <TextField
               value={salesSearch}
@@ -646,9 +657,19 @@ export function ReturnsPage() {
               <Typography fontWeight={900}>
                 Purchase returns history
               </Typography>
-              <Button variant="outlined" size="small" onClick={() => exportToCsv("purchase_returns", purchaseReturns)}>
-                Export
-              </Button>
+              <Stack direction="row" spacing={1}>
+                <Button variant="outlined" size="small" onClick={() => exportToCsv("purchase_returns", purchaseReturns)}>
+                  Export
+                </Button>
+                <CsvImportUpdate 
+                  table="purchase_returns" 
+                  buttonText="Update"
+                  onSuccess={(msg) => {
+                    alert(msg);
+                    refresh();
+                  }} 
+                />
+              </Stack>
             </Stack>
             {purchaseReturns.length === 0 ? (
               <Typography variant="body2" color="text.secondary">

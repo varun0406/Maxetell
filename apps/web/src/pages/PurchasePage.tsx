@@ -39,6 +39,7 @@ import {
 } from "../lib/api";
 import type { MasterProduct, PurchaseLedgerRow, PurchaseReceiptRow } from "../lib/api";
 import { exportToCsv } from "../lib/export";
+import { CsvImportUpdate } from "../components/CsvImportUpdate";
 
 function money(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -309,9 +310,18 @@ export function PurchasePage() {
         <Typography variant="h5" fontWeight={900}>
           Raw material — Purchase orders & receipts
         </Typography>
-        <Button variant="outlined" onClick={() => exportToCsv("purchases", rows)}>
-          Export to Excel
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" onClick={() => exportToCsv("purchases", rows)}>
+            Export to Excel
+          </Button>
+          <CsvImportUpdate 
+            table="purchase_entries" 
+            onSuccess={(msg) => {
+              alert(msg);
+              loadLedger();
+            }} 
+          />
+        </Stack>
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Create a PO first, then record each goods-in (received weight) against that PO. Balance = ordered − received (negative
