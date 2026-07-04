@@ -54,6 +54,7 @@ function resolveProductId(db: Db, size: string, item: string, grade: string) {
 const CreateReceiptBody = z.object({
   receipt_date: z.string().min(10),
   weight_received: z.coerce.number().positive(),
+  client_invoice_no: z.string().trim().optional().nullable(),
   note: z.string().trim().optional(),
 });
 
@@ -75,6 +76,7 @@ const PatchPurchaseBody = z.object({
 const PatchReceiptBody = z.object({
   receipt_date: z.string().min(10).optional(),
   weight_received: z.coerce.number().positive().optional(),
+  client_invoice_no: z.string().trim().optional().nullable(),
   note: z.string().trim().optional().nullable(),
 });
 
@@ -186,7 +188,7 @@ LIMIT 500
     if (!Number.isFinite(id)) return reply.code(400).send({ error: "Invalid id" });
     const rows = db
       .prepare(
-        `SELECT id, receipt_date, weight_received, note, created_at
+        `SELECT id, purchase_entry_id, receipt_date, weight_received, client_invoice_no, note, created_at
          FROM purchase_receipts WHERE purchase_entry_id = ? ORDER BY receipt_date DESC, id DESC`,
       )
       .all(id);
@@ -272,8 +274,8 @@ LIMIT 500
     }
 
     db.prepare(
-      `INSERT INTO purchase_receipts(purchase_entry_id, receipt_date, weight_received, note) VALUES (?,?,?,?)`,
-    ).run(id, body.receipt_date, body.weight_received, body.note ?? null);
+      `INSERT INTO purchase_receipts(purchase_entry_id, receipt_date, weight_received, client_invoice_no, note) VALUES (?,?,?,?,?)`,
+    ).run(id, body.receipt_date, body.weight_received, body.client_invoice_no ?? null, body.note ?? null);
 
     recalcReceived(db, id);
     return { data: ledgerRow(db, id) };

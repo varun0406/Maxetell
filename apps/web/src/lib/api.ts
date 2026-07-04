@@ -472,10 +472,12 @@ export async function fetchPurchaseLedger() {
   return res.data.data;
 }
 
-export type PurchaseReceiptRow = {
+export interface PurchaseReceiptRow {
   id: number;
+  purchase_entry_id: number;
   receipt_date: string;
   weight_received: number;
+  client_invoice_no: string | null;
   note: string | null;
   created_at: string;
 };
@@ -487,7 +489,7 @@ export async function fetchPurchaseReceipts(purchaseId: number) {
 
 export async function createPurchaseReceipt(
   purchaseId: number,
-  body: { receipt_date: string; weight_received: number; note?: string },
+  body: { receipt_date: string; weight_received: number; client_invoice_no?: string | null; note?: string | null },
 ) {
   const res = await api.post<{ data: PurchaseLedgerRow }>(`/purchase/${purchaseId}/receipt`, body);
   return res.data.data;

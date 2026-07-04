@@ -164,7 +164,25 @@ export function DispatchPage() {
           Dispatch Entry
         </Typography>
         <Stack direction="row" spacing={1}>
-          <Button variant="outlined" onClick={() => exportToCsv("dispatch_entries", entries)}>
+          <Button variant="outlined" onClick={() => {
+            const data = entries.map(e => ({
+              ID: e.id,
+              "Dispatch Date": e.dispatch_date,
+              "Dispatch Weight": e.dispatch_weight,
+              "Packing Weight": e.packing_weight,
+              "Dispatch Pcs": e.dispatch_pcs,
+              "Bundle No": e.bundle_no || "",
+              "Transport": e.transport || "",
+              "Sales Rate": e.sales_rate,
+              "Invoice No": selectedWO?.invoice_no || "",
+              "WO No": selectedWO?.wo_no || "",
+              "Item": e.item || "",
+              "Size": e.size || "",
+              "Grade": e.grade || "",
+              "Tally Bills": e.tally_bill_nos?.join(", ") || ""
+            }));
+            exportToCsv("dispatch_entries", data);
+          }}>
             Export to Excel
           </Button>
           <CsvImportUpdate 

@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS purchase_receipts (
   purchase_entry_id INTEGER NOT NULL REFERENCES purchase_entries(id) ON DELETE CASCADE,
   receipt_date TEXT NOT NULL,
   weight_received REAL NOT NULL CHECK(weight_received > 0),
+  client_invoice_no TEXT,
   note TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -132,6 +133,7 @@ CREATE TABLE IF NOT EXISTS order_line_items (
   migrateAppSettings(db);
   migrateAppUsers(db);
   migrateJobWorkOut(db);
+  migratePurchaseReceiptsInvoice(db);
 }
 
 function migrateAppUsers(db: Db) {
@@ -421,6 +423,12 @@ CREATE TABLE IF NOT EXISTS dispatch_tally_bills (
   }
   if (!columnExists(db, "dispatch_entries", "packing_weight")) {
     db.exec(`ALTER TABLE dispatch_entries ADD COLUMN packing_weight REAL DEFAULT 0 CHECK(packing_weight >= 0);`);
+  }
+}
+
+function migratePurchaseReceiptsInvoice(db: Db) {
+  if (!columnExists(db, "purchase_receipts", "client_invoice_no")) {
+    db.exec(`ALTER TABLE purchase_receipts ADD COLUMN client_invoice_no TEXT`);
   }
 }
 

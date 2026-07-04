@@ -63,7 +63,8 @@ export function PurchasePage() {
 
   const [poForReceipt, setPoForReceipt] = useState<PurchaseLedgerRow | null>(null);
   const [recDate, setRecDate] = useState(dayjs().format("YYYY-MM-DD"));
-  const [recWeight, setRecWeight] = useState<number>(0);
+  const [recWeight, setRecWeight] = useState(0);
+  const [recClientInvoice, setRecClientInvoice] = useState("");
   const [recNote, setRecNote] = useState("");
 
   const [drawerPo, setDrawerPo] = useState<PurchaseLedgerRow | null>(null);
@@ -216,11 +217,13 @@ export function PurchasePage() {
       const updated = await createPurchaseReceipt(poForReceipt.id, {
         receipt_date: recDate,
         weight_received: recWeight,
-        note: recNote.trim() || undefined,
+        client_invoice_no: recClientInvoice || null,
+        note: recNote || null,
       });
       setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
       setPoForReceipt(updated);
       setRecWeight(0);
+      setRecClientInvoice("");
       setRecNote("");
       if (drawerPo?.id === updated.id) {
         setDrawerPo(updated);
@@ -563,6 +566,12 @@ export function PurchasePage() {
                   type="number"
                   value={recWeight}
                   onChange={(e) => setRecWeight(Number(e.target.value))}
+                  fullWidth
+                />
+                <TextField
+                  label="Client Invoice No"
+                  value={recClientInvoice}
+                  onChange={(e) => setRecClientInvoice(e.target.value)}
                   fullWidth
                 />
                 <TextField
@@ -958,6 +967,21 @@ export function PurchasePage() {
                         onBlur={() => {
                           const current = receiptLines.find((x) => x.id === line.id);
                           if (current) void saveReceiptLine(line.id, { weight_received: current.weight_received });
+                        }}
+                        sx={{ width: 120 }}
+                      />
+                      <TextField
+                        size="small"
+                        placeholder="Inv No"
+                        value={line.client_invoice_no ?? ""}
+                        onChange={(e) =>
+                          setReceiptLines((prev) =>
+                            prev.map((x) => (x.id === line.id ? { ...x, client_invoice_no: e.target.value || null } : x)),
+                          )
+                        }
+                        onBlur={() => {
+                          const current = receiptLines.find((x) => x.id === line.id);
+                          if (current) void saveReceiptLine(line.id, { client_invoice_no: current.client_invoice_no });
                         }}
                         sx={{ width: 120 }}
                       />
