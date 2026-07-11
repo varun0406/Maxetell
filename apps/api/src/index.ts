@@ -16,6 +16,11 @@ import { extractBearer, parseAuthToken } from "./auth.js";
 import { registerReturnsRoutes } from "./routes/returns.js";
 import { registerJobWorkRoutes } from "./routes/jobwork.js";
 import { registerSyncRoutes } from "./routes/sync.js";
+import { registerTxMastersRoutes } from "./routes/tx_masters.js";
+import { registerTxStockRoutes } from "./routes/tx_stock.js";
+import { registerTxPackingRoutes } from "./routes/tx_packing.js";
+import { registerTxGodownRoutes } from "./routes/tx_godown.js";
+import { registerTxChallanRoutes } from "./routes/tx_challan.js";
 
 const env = loadEnv(process.env);
 
@@ -70,5 +75,10 @@ await registerInventoryRoutes(app, { db });
 await registerReturnsRoutes(app, { db });
 await registerJobWorkRoutes(app, { db });
 await registerSyncRoutes(app, { db });
+await registerTxMastersRoutes(app, { db });
+await registerTxStockRoutes(app, { db });
+await registerTxPackingRoutes(app, { db });
+await registerTxGodownRoutes(app, { db });
+await registerTxChallanRoutes(app, { db });
 
 await app.listen({ port: env.PORT, host: env.HOST });

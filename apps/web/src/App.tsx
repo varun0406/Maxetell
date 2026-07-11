@@ -14,6 +14,12 @@ import { ReturnsPage } from "./pages/ReturnsPage.tsx";
 import { UsersPage } from "./pages/UsersPage.tsx";
 import { JobWorkPage } from "./pages/JobWorkPage.tsx";
 import { JobWorkOutPage } from "./pages/JobWorkOutPage.tsx";
+import { TxItemCharterPage } from "./pages/TxItemCharterPage.tsx";
+import { TxMastersPage } from "./pages/TxMastersPage.tsx";
+import { TxStockPage } from "./pages/TxStockPage.tsx";
+import { TxPackingPage } from "./pages/TxPackingPage.tsx";
+import { TxGodownPage } from "./pages/TxGodownPage.tsx";
+import { TxChallanPage } from "./pages/TxChallanPage.tsx";
 
 export default function App() {
   return (
@@ -34,6 +40,12 @@ export default function App() {
             <Route path="jobwork" element={<JobWorkPage />} />
             <Route path="jobwork-out" element={<JobWorkOutPage />} />
             <Route path="users" element={<UsersPage />} />
+            <Route path="tx/items" element={<TxItemCharterPage />} />
+            <Route path="tx/masters" element={<TxMastersPage />} />
+            <Route path="tx/stock" element={<TxStockPage />} />
+            <Route path="tx/packing" element={<TxPackingPage />} />
+            <Route path="tx/godown" element={<TxGodownPage />} />
+            <Route path="tx/challans" element={<TxChallanPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

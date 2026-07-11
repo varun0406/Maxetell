@@ -23,6 +23,12 @@ import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined
 import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
+import StyleOutlinedIcon from "@mui/icons-material/StyleOutlined";
+import WarehouseOutlinedIcon from "@mui/icons-material/WarehouseOutlined";
+import ContentCutOutlinedIcon from "@mui/icons-material/ContentCutOutlined";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
+import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import { Link, useLocation } from "react-router-dom";
 
 const drawerWidth = 260;
@@ -40,6 +46,15 @@ const nav = [
   { to: "/jobwork", label: "Job Work", icon: <AssignmentOutlinedIcon /> },
   { to: "/jobwork-out", label: "Job Work Out", icon: <AssignmentOutlinedIcon /> },
   { to: "/users", label: "Users", icon: <PersonAddOutlinedIcon /> },
+];
+
+const txNav = [
+  { to: "/tx/items", label: "Item Charter", icon: <CategoryOutlinedIcon /> },
+  { to: "/tx/masters", label: "Masters", icon: <TuneOutlinedIcon /> },
+  { to: "/tx/stock", label: "Stock Ledger", icon: <StyleOutlinedIcon /> },
+  { to: "/tx/packing", label: "Packing", icon: <ContentCutOutlinedIcon /> },
+  { to: "/tx/godown", label: "Godown", icon: <WarehouseOutlinedIcon /> },
+  { to: "/tx/challans", label: "Delivery Challan", icon: <ArticleOutlinedIcon /> },
 ];
 
 export function AppShell() {
@@ -93,6 +108,20 @@ export function AppShell() {
               to={n.to}
               selected={loc.pathname === n.to}
               sx={{ borderRadius: 2, mb: 0.5 }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>{n.icon}</ListItemIcon>
+              <ListItemText primary={n.label} primaryTypographyProps={{ fontWeight: 600 }} />
+            </ListItemButton>
+          ))}
+          <Divider sx={{ my: 1 }} />
+          <Typography variant="caption" color="text.secondary" sx={{ px: 1, fontWeight: 700, letterSpacing: 1 }}>MAXWELL TRADING</Typography>
+          {txNav.map((n) => (
+            <ListItemButton
+              key={n.to}
+              component={Link}
+              to={n.to}
+              selected={loc.pathname === n.to}
+              sx={{ borderRadius: 2, mb: 0.5, mt: 0.5 }}
             >
               <ListItemIcon sx={{ minWidth: 36 }}>{n.icon}</ListItemIcon>
               <ListItemText primary={n.label} primaryTypographyProps={{ fontWeight: 600 }} />

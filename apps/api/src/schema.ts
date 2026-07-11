@@ -134,6 +134,157 @@ CREATE TABLE IF NOT EXISTS order_line_items (
   migrateAppUsers(db);
   migrateJobWorkOut(db);
   migratePurchaseReceiptsInvoice(db);
+  migrateMaxwellTrading(db);
+}
+
+// ─── Maxwell Trading — Textile Stock Management ───────────────────────────────
+function migrateMaxwellTrading(db: Db) {
+  db.exec(`
+    -- Parent items  e.g. code="1"  name="Carens"
+    CREATE TABLE IF NOT EXISTS tx_items (
+      id          INTEGER PRIMARY KEY,
+      code        TEXT NOT NULL UNIQUE,   -- 2-3 chars, admin-managed
+      name        TEXT NOT NULL UNIQUE,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Variants/colours  e.g. variant_code="1-a"  variant_name="Light Blue"
+    CREATE TABLE IF NOT EXISTS tx_item_variants (
+      id            INTEGER PRIMARY KEY,
+      item_id       INTEGER NOT NULL REFERENCES tx_items(id) ON DELETE CASCADE,
+      variant_code  TEXT NOT NULL UNIQUE,  -- full code used everywhere
+      variant_name  TEXT NOT NULL,
+      color         TEXT,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Fabric-supplying companies
+    CREATE TABLE IF NOT EXISTS tx_companies (
+      id          INTEGER PRIMARY KEY,
+      name        TEXT NOT NULL UNIQUE,
+      contact     TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Job-work mills
+    CREATE TABLE IF NOT EXISTS tx_mills (
+      id            INTEGER PRIMARY KEY,
+      name          TEXT NOT NULL UNIQUE,
+      contact       TEXT,
+      job_work_type TEXT,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Godowns
+    CREATE TABLE IF NOT EXISTS tx_godowns (
+      id          INTEGER PRIMARY KEY,
+      code        TEXT NOT NULL UNIQUE,
+      name        TEXT NOT NULL,
+      location    TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Delivery addresses / parties
+    CREATE TABLE IF NOT EXISTS tx_delivery_addresses (
+      id           INTEGER PRIMARY KEY,
+      party_name   TEXT NOT NULL,
+      address_line TEXT,
+      city         TEXT,
+      state        TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Stock In lots (inward from company) — no rate
+    CREATE TABLE IF NOT EXISTS tx_stock_in (
+      id            INTEGER PRIMARY KEY,
+      lot_no        TEXT NOT NULL UNIQUE,
+      company_id    INTEGER NOT NULL REFERENCES tx_companies(id),
+      variant_code  TEXT NOT NULL REFERENCES tx_item_variants(variant_code),
+      meter         REAL NOT NULL CHECK(meter > 0),
+      received_date TEXT NOT NULL,
+      notes         TEXT,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Mill Job Work Out (sent for processing)
+    CREATE TABLE IF NOT EXISTS tx_mill_out (
+      id             INTEGER PRIMARY KEY,
+      lot_no         TEXT NOT NULL UNIQUE,
+      mill_id        INTEGER NOT NULL REFERENCES tx_mills(id),
+      variant_code   TEXT NOT NULL,
+      meter          REAL NOT NULL CHECK(meter > 0),
+      ref_stock_in_id INTEGER REFERENCES tx_stock_in(id),
+      sent_date      TEXT NOT NULL,
+      notes          TEXT,
+      status         TEXT NOT NULL DEFAULT 'pending'
+                     CHECK(status IN ('pending','received')),
+      created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Mill Return (received back after processing)
+    CREATE TABLE IF NOT EXISTS tx_mill_return (
+      id            INTEGER PRIMARY KEY,
+      mill_out_id   INTEGER NOT NULL REFERENCES tx_mill_out(id),
+      variant_code  TEXT NOT NULL,
+      meter         REAL NOT NULL CHECK(meter > 0),
+      received_date TEXT NOT NULL,
+      notes         TEXT,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Packing entries (split stock into pieces; faulty status tracked here)
+    CREATE TABLE IF NOT EXISTS tx_packing (
+      id            INTEGER PRIMARY KEY,
+      packing_id    TEXT NOT NULL UNIQUE,   -- PKG-YYYYMMDD-NNN
+      source_type   TEXT NOT NULL CHECK(source_type IN ('stock_in','mill_return')),
+      source_id     INTEGER NOT NULL,
+      variant_code  TEXT NOT NULL,
+      meter         REAL NOT NULL CHECK(meter > 0),
+      packing_date  TEXT NOT NULL,
+      created_by    INTEGER REFERENCES app_users(id),
+      status        TEXT NOT NULL DEFAULT 'packed'
+                    CHECK(status IN ('packed','in_godown','dispatched','faulty')),
+      notes         TEXT,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Godown stock (Packing IDs in godown)
+    CREATE TABLE IF NOT EXISTS tx_godown_stock (
+      id            INTEGER PRIMARY KEY,
+      packing_id    TEXT NOT NULL UNIQUE REFERENCES tx_packing(packing_id),
+      godown_id     INTEGER NOT NULL REFERENCES tx_godowns(id),
+      received_date TEXT NOT NULL,
+      received_by   INTEGER REFERENCES app_users(id),
+      status        TEXT NOT NULL DEFAULT 'in_godown'
+                    CHECK(status IN ('in_godown','dispatched')),
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Delivery Challans (Admin creates, Floor Manager dispatches)
+    CREATE TABLE IF NOT EXISTS tx_challans (
+      id          INTEGER PRIMARY KEY,
+      challan_no  TEXT NOT NULL UNIQUE,
+      challan_date TEXT NOT NULL,
+      address_id  INTEGER REFERENCES tx_delivery_addresses(id),
+      created_by  INTEGER REFERENCES app_users(id),
+      assigned_to INTEGER REFERENCES app_users(id),
+      status      TEXT NOT NULL DEFAULT 'created'
+                  CHECK(status IN ('created','assigned','dispatched','delivered')),
+      notes       TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Challan line items
+    CREATE TABLE IF NOT EXISTS tx_challan_items (
+      id           INTEGER PRIMARY KEY,
+      challan_id   INTEGER NOT NULL REFERENCES tx_challans(id) ON DELETE CASCADE,
+      packing_id   TEXT NOT NULL REFERENCES tx_packing(packing_id),
+      variant_code TEXT NOT NULL,
+      meter        REAL NOT NULL,
+      added_by     INTEGER REFERENCES app_users(id),
+      added_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
 }
 
 function migrateAppUsers(db: Db) {
