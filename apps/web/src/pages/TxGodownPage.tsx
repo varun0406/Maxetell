@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  MenuItem, Paper, Stack, Tab, Table, TableBody, TableCell, TableHead,
+  Alert, Box, Button, Chip, MenuItem, Paper,
+  Stack, Tab, Table, TableBody, TableCell, TableHead,
   TableRow, Tabs, TextField, Typography,
 } from "@mui/material";
 import { api } from "../lib/api";
@@ -38,7 +38,7 @@ function SummaryTab() {
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.id} hover>
-                <TableCell fontWeight={700}>{r.name}</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>{r.name}</TableCell>
                 <TableCell><Chip label={r.code} size="small" sx={{ fontFamily: "monospace" }} /></TableCell>
                 <TableCell align="right">{r.pieces}</TableCell>
                 <TableCell align="right"><b>{r.total_meter.toFixed(1)}</b></TableCell>
@@ -65,7 +65,7 @@ function ReceiveTab() {
   const handleReceive = async () => {
     if (!scan || !godownId) return;
     try {
-      const res = await api.post("/tx/godown/receive", { packing_id: scan, godown_id: godownId, received_date: date });
+      await api.post("/tx/godown/receive", { packing_id: scan, godown_id: godownId, received_date: date });
       setResult({ ok: true, msg: `✓ ${scan} received into godown` });
       setScan("");
       setTimeout(() => scanRef.current?.focus(), 100);
