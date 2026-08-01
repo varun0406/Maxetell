@@ -110,8 +110,8 @@ export function seedMaxwellDemo(db: Db, opts?: { force?: boolean }) {
     for (const v of variants) insV.run(v.item_id, v.code, v.name, v.color);
 
     const insR = db.prepare(`
-      INSERT INTO mx_rolls(roll_id, short_code, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))
+      INSERT INTO mx_rolls(roll_id, short_code, lot_no, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,datetime('now'))
     `);
 
     type RollSeed = {
@@ -140,11 +140,12 @@ export function seedMaxwellDemo(db: Db, opts?: { force?: boolean }) {
     ];
 
     const rolls: { id: string; short: string; variant: string; remaining: number }[] = [];
+    let lotSeq = 1001;
     for (const rs of rollSeeds) {
       const id = uuid();
-      const sc = short("R", id);
-      insR.run(id, sc, rs.supplier, rs.variant, rs.meters, rs.remaining, rs.status, daysAgo(rs.days), "Demo seed");
-      rolls.push({ id, short: sc, variant: rs.variant, remaining: rs.remaining });
+      const lot = `LOT-${rs.variant.toUpperCase()}-${lotSeq++}`;
+      insR.run(id, lot, lot, rs.supplier, rs.variant, rs.meters, rs.remaining, rs.status, daysAgo(rs.days), "Demo seed");
+      rolls.push({ id, short: lot, variant: rs.variant, remaining: rs.remaining });
     }
 
     // Job work open + returned

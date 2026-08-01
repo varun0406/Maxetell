@@ -39,7 +39,7 @@ function newId() {
 function rollToSession(roll: RollRow, flow: CuttingFlow): CuttingSession {
   return {
     roll_id: roll.roll_id,
-    roll_short: roll.short_code,
+    roll_short: (roll as any).lot_no || (roll as any).lot_display || roll.short_code,
     variant_code: roll.variant_code,
     variant_name: roll.variant_name ?? roll.variant_code,
     color: roll.color ?? null,
@@ -122,7 +122,13 @@ export function CuttingStationPage() {
     const code = rollScan.trim();
     if (!code || !pickedVariant) return;
     try {
-      let roll = rolls.find((r) => r.short_code === code || r.roll_id === code);
+      let roll = rolls.find(
+        (r) =>
+          r.short_code === code ||
+          r.roll_id === code ||
+          (r as any).lot_no?.toUpperCase() === code ||
+          (r as any).lot_display?.toUpperCase() === code,
+      );
       if (!roll) {
         const res = await api.get(`/mx/rolls/${encodeURIComponent(code)}`);
         roll = res.data.data;
@@ -263,13 +269,13 @@ export function CuttingStationPage() {
           Step 1 — Select quality / variant
         </p>
         <div className="floor-card" style={{ marginBottom: 16 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+          <label className="floor-check">
             <input
               type="checkbox"
               checked={flow === "direct_dispatch"}
               onChange={(e) => setFlow(e.target.checked ? "direct_dispatch" : "normal")}
             />
-            Peak season: direct dispatch (job work → client, skip godown)
+            Peak season: direct dispatch (skip godown)
           </label>
         </div>
         {variants.map((v) => (
@@ -305,21 +311,11 @@ export function CuttingStationPage() {
           </div>
         </div>
         <p className="floor-label" style={{ marginBottom: 8 }}>
-          Step 2 — Scan or tap roll
+          Step 2 — Scan or tap lot
         </p>
         <input
-          className="floor-mono"
-          style={{
-            width: "100%",
-            minHeight: 56,
-            fontSize: 18,
-            padding: "0 16px",
-            marginBottom: 12,
-            background: "var(--mx-surface)",
-            border: "2px solid var(--mx-outline)",
-            color: "var(--mx-on-surface)",
-          }}
-          placeholder="Scan roll barcode…"
+          className="floor-input floor-mono"
+          placeholder="Scan / type lot no…"
           value={rollScan}
           autoFocus
           onChange={(e) => setRollScan(e.target.value)}
@@ -327,12 +323,14 @@ export function CuttingStationPage() {
         />
         {rolls.map((r) => (
           <button key={r.roll_id} type="button" className="floor-variant-tile" onClick={() => void pickRoll(r)}>
-            <div className="floor-mono" style={{ fontWeight: 700 }}>{r.short_code}</div>
+            <div className="floor-mono" style={{ fontWeight: 700, color: "var(--mx-primary)", fontSize: 18 }}>
+              {(r as any).lot_no || r.short_code}
+            </div>
             <div style={{ color: "var(--mx-success)", fontWeight: 700, fontSize: 18 }}>{r.remaining_meterage} m left</div>
-            <div className="floor-label">{r.status}</div>
+            <div className="floor-label">Job {(r as any).job_id || r.roll_id.slice(0, 8)} · {r.status}</div>
           </button>
         ))}
-        {!rolls.length && <p style={{ color: "var(--mx-muted)" }}>No rolls with balance for this variant</p>}
+        {!rolls.length && <p className="floor-sub">No lots with balance for this variant</p>}
       </div>
     );
   }
@@ -357,9 +355,12 @@ export function CuttingStationPage() {
       <div className="floor-card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div className="floor-label">Roll</div>
+            <div className="floor-label">Lot</div>
             <div className="floor-mono" style={{ fontSize: 18, fontWeight: 700, color: "var(--mx-primary)" }}>
               {session.roll_short}
+            </div>
+            <div className="floor-label" style={{ marginTop: 6 }}>
+              Job {session.roll_id.slice(0, 8).toUpperCase()}
             </div>
           </div>
           <div style={{ textAlign: "right" }}>

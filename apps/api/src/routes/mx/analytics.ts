@@ -335,6 +335,116 @@ export async function registerMxAnalyticsRoutes(app: FastifyInstance, opts: { db
     return reply.code(404).send({ error: "No lineage found for ref" });
   });
 
+  /** Item → variants modular stock breakdown */
+  app.get("/mx/analytics/by-item", async () => {
+    const items = db
+      .prepare(
+        `
+      SELECT i.id, i.code, i.name, i.quality,
+        COUNT(DISTINCT v.id) AS variant_count,
+        COALESCE(SUM(st.available_m),0) AS available_m,
+        COALESCE(SUM(st.available_pcs),0) AS available_pcs,
+        COALESCE(SUM(st.roll_remaining),0) AS roll_remaining_m,
+        COALESCE(SUM(st.dispatched_m),0) AS dispatched_m
+      FROM mx_items i
+      LEFT JOIN mx_item_variants v ON v.item_id = i.id AND v.deleted_at IS NULL
+      LEFT JOIN (
+        SELECT
+          pk.variant_code,
+          SUM(CASE WHEN pk.status IN ('packed','in_godown','consolidated') THEN pk.length_meters ELSE 0 END) AS available_m,
+          SUM(CASE WHEN pk.status IN ('packed','in_godown','consolidated') THEN 1 ELSE 0 END) AS available_pcs,
+          SUM(CASE WHEN pk.status='dispatched' THEN pk.length_meters ELSE 0 END) AS dispatched_m,
+          0 AS roll_remaining
+        FROM mx_packings pk WHERE pk.deleted_at IS NULL
+        GROUP BY pk.variant_code
+      ) st ON st.variant_code = v.variant_code
+      WHERE i.deleted_at IS NULL
+      GROUP BY i.id
+      ORDER BY i.code
+    `,
+      )
+      .all();
+
+    // attach roll remaining properly
+    const withRolls = (items as any[]).map((it) => {
+      const roll = db
+        .prepare(
+          `
+        SELECT COALESCE(SUM(r.remaining_meterage),0) AS roll_remaining_m
+        FROM mx_rolls r
+        JOIN mx_item_variants v ON v.variant_code = r.variant_code
+        WHERE r.deleted_at IS NULL AND v.item_id = ? AND v.deleted_at IS NULL
+      `,
+        )
+        .get(it.id) as { roll_remaining_m: number };
+      return { ...it, roll_remaining_m: roll.roll_remaining_m };
+    });
+
+    return { data: withRolls };
+  });
+
+  app.get("/mx/analytics/item/:id", async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const item = db.prepare(`SELECT * FROM mx_items WHERE id=? AND deleted_at IS NULL`).get(id) as any;
+    if (!item) return reply.code(404).send({ error: "Item not found" });
+
+    const variants = db
+      .prepare(
+        `
+      SELECT
+        v.variant_code, v.variant_name, v.color,
+        COALESCE(r.roll_remaining, 0) AS roll_remaining_m,
+        COALESCE(r.roll_count, 0) AS roll_count,
+        COALESCE(pk.available_m, 0) AS available_m,
+        COALESCE(pk.available_pcs, 0) AS available_pcs,
+        COALESCE(pk.godown_m, 0) AS godown_m,
+        COALESCE(pk.packed_m, 0) AS packed_m,
+        COALESCE(pk.dispatched_m, 0) AS dispatched_m,
+        COALESCE(jw.wip_m, 0) AS mill_wip_m
+      FROM mx_item_variants v
+      LEFT JOIN (
+        SELECT variant_code, SUM(remaining_meterage) AS roll_remaining, COUNT(1) AS roll_count
+        FROM mx_rolls WHERE deleted_at IS NULL GROUP BY variant_code
+      ) r ON r.variant_code = v.variant_code
+      LEFT JOIN (
+        SELECT variant_code,
+          SUM(CASE WHEN status IN ('packed','in_godown','consolidated') THEN length_meters ELSE 0 END) AS available_m,
+          SUM(CASE WHEN status IN ('packed','in_godown','consolidated') THEN 1 ELSE 0 END) AS available_pcs,
+          SUM(CASE WHEN status='in_godown' THEN length_meters ELSE 0 END) AS godown_m,
+          SUM(CASE WHEN status='packed' THEN length_meters ELSE 0 END) AS packed_m,
+          SUM(CASE WHEN status='dispatched' THEN length_meters ELSE 0 END) AS dispatched_m
+        FROM mx_packings WHERE deleted_at IS NULL GROUP BY variant_code
+      ) pk ON pk.variant_code = v.variant_code
+      LEFT JOIN (
+        SELECT r.variant_code, SUM(j.meter_sent - COALESCE(j.meter_returned,0)) AS wip_m
+        FROM mx_job_work j
+        JOIN mx_rolls r ON r.roll_id = j.roll_id
+        WHERE j.deleted_at IS NULL AND j.processed_state='outward'
+        GROUP BY r.variant_code
+      ) jw ON jw.variant_code = v.variant_code
+      WHERE v.item_id = ? AND v.deleted_at IS NULL
+      ORDER BY v.variant_code
+    `,
+      )
+      .all(id);
+
+    const lots = db
+      .prepare(
+        `
+      SELECT r.roll_id AS job_id, COALESCE(r.lot_no, r.short_code) AS lot_no, r.variant_code,
+             r.remaining_meterage, r.original_meterage, r.status, r.received_date, s.name AS supplier_name
+      FROM mx_rolls r
+      JOIN mx_suppliers s ON s.id = r.supplier_id
+      JOIN mx_item_variants v ON v.variant_code = r.variant_code
+      WHERE v.item_id = ? AND r.deleted_at IS NULL
+      ORDER BY r.received_date DESC
+    `,
+      )
+      .all(id);
+
+    return { data: { item, variants, lots } };
+  });
+
   /** Party-wise challan pendency + dispatch progress */
   app.get("/mx/analytics/by-party", async () => {
     const rows = db

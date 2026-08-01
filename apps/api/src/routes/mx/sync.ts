@@ -159,14 +159,15 @@ export async function registerMxSyncRoutes(app: FastifyInstance, opts: { db: Db 
             results.push({ client_id: item.client_id, entity: item.entity, status: "applied" });
             continue;
           }
-          const short = String(p.short_code ?? `R${roll_id.replace(/-/g, "").slice(0, 8).toUpperCase()}`);
+          const short = String(p.lot_no ?? p.short_code ?? `R${roll_id.replace(/-/g, "").slice(0, 8).toUpperCase()}`).toUpperCase();
           db.prepare(
             `
-            INSERT INTO mx_rolls(roll_id, short_code, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO mx_rolls(roll_id, short_code, lot_no, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
           `,
           ).run(
             roll_id,
+            short,
             short,
             Number(p.supplier_id),
             String(p.variant_code),

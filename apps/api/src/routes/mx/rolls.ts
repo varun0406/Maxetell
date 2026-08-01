@@ -6,17 +6,14 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function shortCode(prefix: string, id: string) {
-  return `${prefix}${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
-}
-
 export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db }) {
   const { db } = opts;
 
   app.get("/mx/rolls", async (req) => {
     const { status, q } = req.query as { status?: string; q?: string };
     let sql = `
-      SELECT r.*, s.name AS supplier_name, v.variant_name, v.color, i.code AS item_code, i.name AS item_name, i.quality
+      SELECT r.*, r.roll_id AS job_id, COALESCE(r.lot_no, r.short_code) AS lot_display,
+             s.name AS supplier_name, v.variant_name, v.color, i.code AS item_code, i.name AS item_name, i.quality
       FROM mx_rolls r
       JOIN mx_suppliers s ON s.id = r.supplier_id
       LEFT JOIN mx_item_variants v ON v.variant_code = r.variant_code
@@ -29,8 +26,8 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
       params.push(status);
     }
     if (q) {
-      sql += ` AND (r.roll_id = ? OR r.short_code LIKE ? OR r.variant_code LIKE ?)`;
-      params.push(q, `%${q}%`, `%${q}%`);
+      sql += ` AND (r.roll_id = ? OR r.short_code LIKE ? OR r.lot_no LIKE ? OR r.variant_code LIKE ?)`;
+      params.push(q, `%${q}%`, `%${q}%`, `%${q}%`);
     }
     if ((req.query as any).variant_code) {
       sql += ` AND r.variant_code = ?`;
@@ -45,15 +42,16 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
     const row = db
       .prepare(
         `
-      SELECT r.*, s.name AS supplier_name, v.variant_name, v.color, i.code AS item_code, i.name AS item_name, i.quality
+      SELECT r.*, r.roll_id AS job_id, COALESCE(r.lot_no, r.short_code) AS lot_display,
+             s.name AS supplier_name, v.variant_name, v.color, i.code AS item_code, i.name AS item_name, i.quality
       FROM mx_rolls r
       JOIN mx_suppliers s ON s.id = r.supplier_id
       LEFT JOIN mx_item_variants v ON v.variant_code = r.variant_code
       LEFT JOIN mx_items i ON i.id = v.item_id
-      WHERE (r.roll_id = ? OR r.short_code = ?) AND r.deleted_at IS NULL
+      WHERE (r.roll_id = ? OR r.short_code = ? OR r.lot_no = ?) AND r.deleted_at IS NULL
     `,
       )
-      .get(roll_id, roll_id);
+      .get(roll_id, roll_id, roll_id);
     if (!row) return reply.code(404).send({ error: "Roll not found" });
     const packings = db
       .prepare(`SELECT * FROM mx_packings WHERE parent_roll_id = ? AND deleted_at IS NULL ORDER BY created_at`)
@@ -61,10 +59,11 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
     return { data: { ...(row as object), packings } };
   });
 
-  app.post("/mx/rolls", async (req) => {
+  app.post("/mx/rolls", async (req, reply) => {
     const body = z
       .object({
         roll_id: z.string().uuid().optional(),
+        lot_no: z.string().trim().min(1).max(64),
         supplier_id: z.number().int().positive(),
         variant_code: z.string().trim().min(1),
         original_meterage: z.number().positive(),
@@ -73,16 +72,22 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
       })
       .parse(req.body);
 
-    const roll_id = body.roll_id ?? crypto.randomUUID();
-    const short_code = shortCode("R", roll_id);
+    const lot = body.lot_no.trim().toUpperCase();
+    const dup = db
+      .prepare(`SELECT roll_id FROM mx_rolls WHERE (lot_no = ? OR short_code = ?) AND deleted_at IS NULL`)
+      .get(lot, lot);
+    if (dup) return reply.code(409).send({ error: `Lot no ${lot} already exists` });
+
+    const job_id = body.roll_id ?? crypto.randomUUID();
     db.prepare(
       `
-      INSERT INTO mx_rolls(roll_id, short_code, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, updated_at)
-      VALUES (?,?,?,?,?,?,'inward',?,?,?)
+      INSERT INTO mx_rolls(roll_id, short_code, lot_no, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, updated_at)
+      VALUES (?,?,?,?,?,?,?,'inward',?,?,?)
     `,
     ).run(
-      roll_id,
-      short_code,
+      job_id,
+      lot,
+      lot,
       body.supplier_id,
       body.variant_code,
       body.original_meterage,
@@ -91,7 +96,17 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
       body.notes ?? null,
       nowIso(),
     );
-    return { data: { roll_id, short_code, ...body, remaining_meterage: body.original_meterage, status: "inward" } };
+    return {
+      data: {
+        job_id,
+        roll_id: job_id,
+        lot_no: lot,
+        short_code: lot,
+        ...body,
+        remaining_meterage: body.original_meterage,
+        status: "inward",
+      },
+    };
   });
 
   app.patch("/mx/rolls/:roll_id/status", async (req, reply) => {

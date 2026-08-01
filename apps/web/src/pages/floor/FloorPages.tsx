@@ -1,18 +1,4 @@
 import { useEffect, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-  Paper,
-  List,
-  ListItem,
-  ListItemText,
-} from "@mui/material";
 import { api } from "../../lib/api";
 import { buildParcelZpl, sendZplImmediate } from "../../lib/print/zpl";
 
@@ -71,38 +57,32 @@ export function ParcelPage() {
   }
 
   return (
-    <Box>
-      <Typography variant="h5" fontWeight={800} gutterBottom>
-        Parcel Consolidation
-      </Typography>
-      <Typography variant="body2" color="text.secondary" mb={2}>
-        Scan 3–4 packing IDs, then seal and print master sticker.
-      </Typography>
-      <TextField
-        fullWidth
-        label="Scan packing"
+    <div>
+      <h1 className="floor-h1">Parcel</h1>
+      <p className="floor-sub">Scan packing stickers, then seal & print master label.</p>
+      {msg && <div className={`floor-toast ${msg.ok ? "ok" : "err"}`}>{msg.text}</div>}
+      <input
+        className="floor-input floor-mono"
+        placeholder="Scan packing barcode…"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && void addScan(input)}
-        sx={{ mb: 2 }}
         autoFocus
       />
-      <List dense>
-        {detail.map((d) => (
-          <ListItem key={d.packing_id}>
-            <ListItemText primary={`${d.short_code} · ${d.variant_code} · ${d.length_meters}m`} secondary={d.packing_id} />
-          </ListItem>
-        ))}
-      </List>
-      <Button variant="contained" disabled={scans.length < 1} onClick={() => void createParcel()}>
+      {detail.map((d) => (
+        <div key={d.packing_id} className="floor-list-item">
+          <div>
+            <strong className="floor-mono">{d.short_code}</strong>
+            <div style={{ color: "var(--mx-muted)", fontSize: 14 }}>
+              {d.variant_code} · {d.length_meters}m
+            </div>
+          </div>
+        </div>
+      ))}
+      <button type="button" className="floor-btn" disabled={scans.length < 1} onClick={() => void createParcel()}>
         Create parcel ({scans.length})
-      </Button>
-      {msg && (
-        <Alert sx={{ mt: 2 }} severity={msg.ok ? "success" : "error"}>
-          {msg.text}
-        </Alert>
-      )}
-    </Box>
+      </button>
+    </div>
   );
 }
 
@@ -114,15 +94,21 @@ export function GodownReceivePage() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
-    api.get("/mx/godowns").then((r) => setGodowns(r.data.data ?? []));
+    api.get("/mx/godowns").then((r) => {
+      const list = r.data.data ?? [];
+      setGodowns(list);
+      if (list[0]) setGodownId(list[0].id);
+    });
   }, []);
 
   async function receive() {
     if (!scan || !godownId) return;
     try {
-      // Resolve packing id
       const p = await api.get(`/mx/packings/${encodeURIComponent(scan.trim())}`);
-      await api.post(`/mx/packings/${p.data.data.packing_id}/godown`, { godown_id: godownId, location_hint: hint || undefined });
+      await api.post(`/mx/packings/${p.data.data.packing_id}/godown`, {
+        godown_id: godownId,
+        location_hint: hint || undefined,
+      });
       setMsg({ ok: true, text: `${p.data.data.short_code} → godown` });
       setScan("");
     } catch (e: any) {
@@ -131,32 +117,33 @@ export function GodownReceivePage() {
   }
 
   return (
-    <Box>
-      <Typography variant="h5" fontWeight={800} gutterBottom>
-        Godown Receive
-      </Typography>
-      <Stack spacing={2} maxWidth={480}>
-        <TextField select label="Godown" value={godownId} onChange={(e) => setGodownId(Number(e.target.value))}>
-          {godowns.map((g) => (
-            <MenuItem key={g.id} value={g.id}>
-              {g.name} ({g.code})
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField label="Rack / location hint" value={hint} onChange={(e) => setHint(e.target.value)} />
-        <TextField
-          label="Scan packing"
-          value={scan}
-          autoFocus
-          onChange={(e) => setScan(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && void receive()}
-        />
-        <Button variant="contained" onClick={() => void receive()}>
-          Receive
-        </Button>
-        {msg && <Alert severity={msg.ok ? "success" : "error"}>{msg.text}</Alert>}
-      </Stack>
-    </Box>
+    <div>
+      <h1 className="floor-h1">Godown receive</h1>
+      <p className="floor-sub">Scan packing into a rack / location.</p>
+      {msg && <div className={`floor-toast ${msg.ok ? "ok" : "err"}`}>{msg.text}</div>}
+      <div className="floor-label">Godown</div>
+      <select className="floor-select" value={godownId} onChange={(e) => setGodownId(Number(e.target.value))}>
+        {godowns.map((g) => (
+          <option key={g.id} value={g.id}>
+            {g.name} ({g.code})
+          </option>
+        ))}
+      </select>
+      <div className="floor-label">Rack / location</div>
+      <input className="floor-input" placeholder="e.g. A-12" value={hint} onChange={(e) => setHint(e.target.value)} />
+      <div className="floor-label">Scan packing</div>
+      <input
+        className="floor-input floor-mono"
+        placeholder="Scan packing…"
+        value={scan}
+        autoFocus
+        onChange={(e) => setScan(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && void receive()}
+      />
+      <button type="button" className="floor-btn" onClick={() => void receive()}>
+        Receive
+      </button>
+    </div>
   );
 }
 
@@ -166,7 +153,6 @@ export function FloorChallanPage() {
   const [scan, setScan] = useState("");
   const [scanType, setScanType] = useState<"packing" | "parcel">("packing");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [buzzer, setBuzzer] = useState(false);
 
   async function loadList() {
     const r = await api.get("/mx/challans");
@@ -183,7 +169,6 @@ export function FloorChallanPage() {
   }
 
   function playAlert() {
-    setBuzzer(true);
     try {
       const ctx = new AudioContext();
       const o = ctx.createOscillator();
@@ -197,7 +182,6 @@ export function FloorChallanPage() {
     } catch {
       /* ignore */
     }
-    setTimeout(() => setBuzzer(false), 600);
   }
 
   async function doScan() {
@@ -231,214 +215,105 @@ export function FloorChallanPage() {
     }
   }
 
-  // Assembled checklist progress
   const reqs: any[] = active?.requirements ?? [];
   const scans: any[] = active?.scans ?? [];
 
-  return (
-    <Box>
-      <Typography variant="h5" fontWeight={800} gutterBottom>
-        Floor Dispatch
-      </Typography>
-      {!active ? (
-        <Stack spacing={1}>
-          {list.map((c) => (
-            <Paper key={c.challan_id} sx={{ p: 2, cursor: "pointer" }} onClick={() => void openChallan(c.challan_id)}>
-              <Typography fontWeight={700}>
-                {c.challan_no} · {c.status}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {c.party_name || c.addr_party || "—"} · {c.scan_count} scans
-              </Typography>
-            </Paper>
-          ))}
-          {!list.length && <Typography color="text.secondary">No open challans</Typography>}
-        </Stack>
-      ) : (
-        <Box>
-          <Button size="small" onClick={() => setActive(null)}>
-            ← Back
-          </Button>
-          <Typography fontWeight={800} mt={1}>
-            {active.challan_no}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mb={2}>
-            {active.party_name || active.addr_party} · {active.status}
-          </Typography>
-
-          <Typography fontWeight={700} mb={1}>
-            Required materials
-          </Typography>
-          {reqs.map((r) => (
-            <Chip key={r.variant_code} label={`${r.variant_code} · ${r.required_meters}m / ${r.required_pieces}pcs`} sx={{ m: 0.5 }} />
-          ))}
-          {!reqs.length && <Typography variant="body2">No checklist — any stock allowed</Typography>}
-
-          <Typography fontWeight={700} mt={2} mb={1}>
-            Location hints
-          </Typography>
-          {(active.location_hints ?? []).slice(0, 8).map((h: any) => (
-            <Typography key={h.packing_id} variant="body2">
-              {h.variant_code} · {h.short_code} → {h.godown_name ?? "?"} {h.location_hint ?? ""}
-            </Typography>
-          ))}
-
-          <Stack direction="row" spacing={1} mt={2} mb={1}>
-            <TextField select size="small" label="Type" value={scanType} onChange={(e) => setScanType(e.target.value as any)} sx={{ width: 140 }}>
-              <MenuItem value="packing">Packing</MenuItem>
-              <MenuItem value="parcel">Parcel</MenuItem>
-            </TextField>
-            <TextField
-              fullWidth
-              size="small"
-              label="Scan ID"
-              value={scan}
-              autoFocus
-              onChange={(e) => setScan(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void doScan()}
-              error={buzzer}
-            />
-            <Button variant="contained" onClick={() => void doScan()}>
-              Add
-            </Button>
-          </Stack>
-
-          <Typography fontWeight={700} mb={1}>
-            Scanned ({scans.length})
-          </Typography>
-          {scans.map((s) => (
-            <Chip key={s.scan_id} label={`${s.scan_type}: ${s.scanned_ref.slice(0, 12)}…`} sx={{ m: 0.5 }} color="success" />
-          ))}
-
-          <Button variant="contained" color="secondary" sx={{ mt: 2 }} onClick={() => void dispatch()}>
-            Dispatch challan
-          </Button>
-          {msg && (
-            <Alert sx={{ mt: 2 }} severity={msg.ok ? "success" : "error"}>
-              {msg.text}
-            </Alert>
-          )}
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-export function AdminChallanCreatePage() {
-  const [addresses, setAddresses] = useState<any[]>([]);
-  const [parties, setParties] = useState<any[]>([]);
-  const [agents, setAgents] = useState<any[]>([]);
-  const [variants, setVariants] = useState<any[]>([]);
-  const [form, setForm] = useState({
-    challan_date: new Date().toISOString().slice(0, 10),
-    party_id: 0,
-    address_id: 0,
-    agent_id: 0,
-    notes: "",
-  });
-  const [reqs, setReqs] = useState<{ variant_code: string; required_meters: number; required_pieces: number }[]>([]);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    Promise.all([api.get("/mx/addresses"), api.get("/mx/parties"), api.get("/mx/agents"), api.get("/mx/items")]).then(
-      ([a, p, ag, i]) => {
-        setAddresses(a.data.data ?? []);
-        setParties(p.data.data ?? []);
-        setAgents(ag.data.data ?? []);
-        setVariants(i.data.data.variants ?? []);
-      },
-    );
-  }, []);
-
-  const shipOptions = form.party_id
-    ? addresses.filter((a) => a.party_id === form.party_id || !a.party_id)
-    : addresses;
-
-  return (
-    <Box>
-      <Typography variant="h5" fontWeight={800} gutterBottom>
-        Create Delivery Challan
-      </Typography>
-      <Stack spacing={2} maxWidth={560}>
-        <TextField type="date" label="Date" InputLabelProps={{ shrink: true }} value={form.challan_date} onChange={(e) => setForm({ ...form, challan_date: e.target.value })} />
-        <TextField
-          select
-          label="Party (billing)"
-          value={form.party_id}
-          onChange={(e) => setForm({ ...form, party_id: Number(e.target.value), address_id: 0 })}
-        >
-          <MenuItem value={0}>—</MenuItem>
-          {parties.map((p) => (
-            <MenuItem key={p.id} value={p.id}>
-              {p.name} {p.gstin ? `· ${p.gstin}` : ""}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField select label="Deliver to (ship address)" value={form.address_id} onChange={(e) => setForm({ ...form, address_id: Number(e.target.value) })}>
-          <MenuItem value={0}>—</MenuItem>
-          {shipOptions.map((a) => (
-            <MenuItem key={a.id} value={a.id}>
-              {a.party_name} · {a.address_line ?? ""} {a.city ?? ""}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField select label="Agent" value={form.agent_id} onChange={(e) => setForm({ ...form, agent_id: Number(e.target.value) })}>
-          <MenuItem value={0}>—</MenuItem>
-          {agents.map((a) => (
-            <MenuItem key={a.id} value={a.id}>
-              {a.name}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-
-        <Typography fontWeight={700}>Requirements</Typography>
-        {reqs.map((r, idx) => (
-          <Stack direction="row" spacing={1} key={idx}>
-            <Chip label={`${r.variant_code} ${r.required_meters}m / ${r.required_pieces}pcs`} onDelete={() => setReqs(reqs.filter((_, i) => i !== idx))} />
-          </Stack>
+  if (!active) {
+    return (
+      <div>
+        <h1 className="floor-h1">Dispatch</h1>
+        <p className="floor-sub">Open a challan, scan stock, then dispatch.</p>
+        {msg && <div className={`floor-toast ${msg.ok ? "ok" : "err"}`}>{msg.text}</div>}
+        {list.map((c) => (
+          <button key={c.challan_id} type="button" className="floor-variant-tile" onClick={() => void openChallan(c.challan_id)}>
+            <div className="floor-mono" style={{ fontWeight: 700, color: "var(--mx-primary)", fontSize: 18 }}>
+              {c.challan_no}
+            </div>
+            <div style={{ marginTop: 4 }}>{c.party_master_name || c.party_name || c.addr_party || "—"}</div>
+            <div className="floor-label" style={{ marginTop: 6 }}>
+              {c.status} · {c.scan_count} scans
+            </div>
+          </button>
         ))}
-        <Stack direction="row" spacing={1}>
-          <TextField
-            select
-            size="small"
-            label="Variant"
-            sx={{ minWidth: 160 }}
-            defaultValue=""
-            onChange={(e) => {
-              const code = e.target.value;
-              if (!code) return;
-              setReqs([...reqs, { variant_code: code, required_meters: 0, required_pieces: 1 }]);
-            }}
-          >
-            {variants.map((v) => (
-              <MenuItem key={v.variant_code} value={v.variant_code}>
-                {v.variant_code}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Stack>
+        {!list.length && <p className="floor-sub">No open challans</p>}
+      </div>
+    );
+  }
 
-        <Button
-          variant="contained"
-          onClick={async () => {
-            const body = {
-              challan_date: form.challan_date,
-              notes: form.notes,
-              party_id: form.party_id || undefined,
-              address_id: form.address_id || undefined,
-              agent_id: form.agent_id || undefined,
-              requirements: reqs,
-            };
-            const res = await api.post("/mx/challans", body);
-            setMsg(`Created ${res.data.data.challan_no}`);
-            setReqs([]);
-          }}
-        >
-          Create challan
-        </Button>
-        {msg && <Alert severity="success">{msg}</Alert>}
-      </Stack>
-    </Box>
+  return (
+    <div>
+      {msg && <div className={`floor-toast ${msg.ok ? "ok" : "err"}`}>{msg.text}</div>}
+      <button type="button" className="floor-btn ghost" onClick={() => setActive(null)}>
+        ← Back to list
+      </button>
+      <div className="floor-variant-banner">
+        <div className="floor-label">Challan</div>
+        <div className="floor-mono" style={{ fontSize: 22, fontWeight: 700 }}>
+          {active.challan_no}
+        </div>
+        <div>
+          {active.party_name_master || active.party_name || active.addr_party} · {active.status}
+        </div>
+      </div>
+
+      <div className="floor-label">Required</div>
+      <div className="floor-card">
+        {reqs.length ? (
+          reqs.map((r) => (
+            <div key={r.variant_code} style={{ marginBottom: 8 }}>
+              <strong className="floor-mono">{r.variant_code}</strong> — {r.required_meters}m / {r.required_pieces} pcs
+            </div>
+          ))
+        ) : (
+          <div style={{ color: "var(--mx-muted)" }}>No checklist — any stock allowed</div>
+        )}
+      </div>
+
+      {(active.location_hints ?? []).length > 0 && (
+        <>
+          <div className="floor-label">Where to find</div>
+          <div className="floor-card">
+            {(active.location_hints ?? []).slice(0, 8).map((h: any) => (
+              <div key={h.packing_id} style={{ marginBottom: 6, fontSize: 14 }}>
+                <strong>{h.variant_code}</strong> · {h.short_code} → {h.godown_name ?? "?"} {h.location_hint ?? ""}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="floor-label">Scan type</div>
+      <select className="floor-select" value={scanType} onChange={(e) => setScanType(e.target.value as any)}>
+        <option value="packing">Packing</option>
+        <option value="parcel">Parcel</option>
+      </select>
+      <input
+        className="floor-input floor-mono"
+        placeholder="Scan packing / parcel…"
+        value={scan}
+        autoFocus
+        onChange={(e) => setScan(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && void doScan()}
+      />
+      <button type="button" className="floor-btn secondary" style={{ marginBottom: 12 }} onClick={() => void doScan()}>
+        Add scan
+      </button>
+
+      <div className="floor-label">Scanned ({scans.length})</div>
+      {scans.map((s) => (
+        <div key={s.scan_id} className="floor-list-item">
+          <span className="floor-mono">
+            {s.scan_type}: {String(s.scanned_ref).slice(0, 16)}
+          </span>
+        </div>
+      ))}
+
+      <button type="button" className="floor-btn" style={{ marginTop: 12 }} onClick={() => void dispatch()}>
+        Dispatch challan
+      </button>
+    </div>
   );
 }
+
+/* Admin challan create stays MUI — imported from same module historically */
+export { AdminChallanCreatePage } from "./AdminChallanCreatePage";

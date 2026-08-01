@@ -420,7 +420,14 @@ export function RollsPage() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [variants, setVariants] = useState<any[]>([]);
   const [workers, setWorkers] = useState<any[]>([]);
-  const [form, setForm] = useState({ supplier_id: 0, variant_code: "", original_meterage: 100, received_date: new Date().toISOString().slice(0, 10), notes: "" });
+  const [form, setForm] = useState({
+    supplier_id: 0,
+    variant_code: "",
+    lot_no: "",
+    original_meterage: 100,
+    received_date: new Date().toISOString().slice(0, 10),
+    notes: "",
+  });
   const [jw, setJw] = useState({ roll_id: "", job_worker_id: 0, meter_sent: 0, outward_date: new Date().toISOString().slice(0, 10) });
 
   async function load() {
@@ -437,9 +444,21 @@ export function RollsPage() {
   return (
     <Box>
       <Typography variant="h5" fontWeight={800} gutterBottom>
-        Supplier Rolls
+        Stock in (lots)
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        Type the supplier <strong>lot no</strong>. System creates a unique <strong>job ID</strong> for tracing cuts → parcels → challans.
       </Typography>
       <Stack direction={{ xs: "column", md: "row" }} spacing={1} mb={2} flexWrap="wrap">
+        <TextField
+          size="small"
+          label="Lot no"
+          required
+          value={form.lot_no}
+          onChange={(e) => setForm({ ...form, lot_no: e.target.value })}
+          sx={{ minWidth: 140 }}
+          placeholder="e.g. SF-2401-A"
+        />
         <TextField select size="small" label="Supplier" value={form.supplier_id} onChange={(e) => setForm({ ...form, supplier_id: Number(e.target.value) })} sx={{ minWidth: 160 }}>
           {suppliers.map((s) => (
             <MenuItem key={s.id} value={s.id}>
@@ -459,7 +478,9 @@ export function RollsPage() {
         <Button
           variant="contained"
           onClick={async () => {
+            if (!form.lot_no.trim()) return;
             await api.post("/mx/rolls", form);
+            setForm({ ...form, lot_no: "" });
             await load();
           }}
         >
@@ -471,10 +492,10 @@ export function RollsPage() {
         Send to job work
       </Typography>
       <Stack direction="row" spacing={1} mb={2} flexWrap="wrap">
-        <TextField select size="small" label="Roll" value={jw.roll_id} onChange={(e) => setJw({ ...jw, roll_id: e.target.value })} sx={{ minWidth: 180 }}>
+        <TextField select size="small" label="Lot" value={jw.roll_id} onChange={(e) => setJw({ ...jw, roll_id: e.target.value })} sx={{ minWidth: 180 }}>
           {rows.filter((r) => r.remaining_meterage > 0).map((r) => (
             <MenuItem key={r.roll_id} value={r.roll_id}>
-              {r.short_code} ({r.remaining_meterage}m)
+              {r.lot_no || r.short_code} ({r.remaining_meterage}m)
             </MenuItem>
           ))}
         </TextField>
@@ -505,7 +526,8 @@ export function RollsPage() {
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Roll</TableCell>
+            <TableCell>Lot no</TableCell>
+            <TableCell>Job ID</TableCell>
             <TableCell>Supplier</TableCell>
             <TableCell>Variant</TableCell>
             <TableCell>Remaining</TableCell>
@@ -516,7 +538,8 @@ export function RollsPage() {
         <TableBody>
           {rows.map((r) => (
             <TableRow key={r.roll_id}>
-              <TableCell sx={{ fontFamily: "monospace" }}>{r.short_code}</TableCell>
+              <TableCell sx={{ fontFamily: "monospace", fontWeight: 700 }}>{r.lot_no || r.short_code}</TableCell>
+              <TableCell sx={{ fontFamily: "monospace", fontSize: 12 }}>{String(r.job_id || r.roll_id).slice(0, 8).toUpperCase()}</TableCell>
               <TableCell>{r.supplier_name}</TableCell>
               <TableCell>{r.variant_code}</TableCell>
               <TableCell>

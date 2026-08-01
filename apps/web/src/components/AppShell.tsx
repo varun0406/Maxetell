@@ -11,7 +11,7 @@ import {
   Typography,
   Chip,
 } from "@mui/material";
-import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
 import StyleOutlinedIcon from "@mui/icons-material/StyleOutlined";
@@ -28,9 +28,10 @@ import { startSyncWorker } from "../offline/syncWorker";
 const drawerWidth = 260;
 
 const nav = [
-  { to: "/", label: "Stock Dashboard", icon: <DashboardOutlinedIcon /> },
+  { to: "/", label: "Items", icon: <Inventory2OutlinedIcon /> },
+  { to: "/dashboard", label: "Analytics", icon: <DashboardOutlinedIcon /> },
   { to: "/masters", label: "Masters", icon: <CategoryOutlinedIcon /> },
-  { to: "/rolls", label: "Supplier Rolls", icon: <StyleOutlinedIcon /> },
+  { to: "/rolls", label: "Stock In / Lots", icon: <StyleOutlinedIcon /> },
   { to: "/challans", label: "Delivery Challans", icon: <ArticleOutlinedIcon /> },
   { to: "/challans/new", label: "New Challan", icon: <ArticleOutlinedIcon /> },
   { to: "/floor/cutting", label: "Floor App", icon: <ContentCutOutlinedIcon />, highlight: true },

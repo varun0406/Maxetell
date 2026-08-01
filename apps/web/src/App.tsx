@@ -10,6 +10,7 @@ import {
   SettingsSyncPage,
   UsersAdminPage,
 } from "./pages/admin/AdminPages.tsx";
+import { ItemCatalogPage } from "./pages/admin/ItemCatalogPage.tsx";
 import { ChallansListPage } from "./pages/admin/ChallansListPage.tsx";
 import {
   AdminChallanCreatePage,
@@ -26,7 +27,9 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<AppShell />}>
-            <Route index element={<AnalyticsPage />} />
+            <Route index element={<ItemCatalogPage />} />
+            <Route path="dashboard" element={<AnalyticsPage />} />
+            <Route path="items" element={<ItemCatalogPage />} />
             <Route path="masters" element={<MastersPage />} />
             <Route path="rolls" element={<RollsPage />} />
             <Route path="challans" element={<ChallansListPage />} />

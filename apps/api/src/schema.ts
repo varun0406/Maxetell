@@ -63,6 +63,15 @@ function migratePartiesAgentsReporting(db: Db) {
   ensureColumn(db, "mx_job_work", "received_by", "TEXT");
   ensureColumn(db, "mx_job_work", "shortage_meters", "REAL DEFAULT 0");
 
+  ensureColumn(db, "mx_rolls", "lot_no", "TEXT");
+  // Backfill lot_no from short_code where missing
+  try {
+    db.exec(`UPDATE mx_rolls SET lot_no = short_code WHERE lot_no IS NULL OR TRIM(lot_no) = ''`);
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mx_rolls_lot_no ON mx_rolls(lot_no) WHERE lot_no IS NOT NULL AND deleted_at IS NULL`);
+  } catch {
+    /* index may already exist */
+  }
+
   // Backfill parties from legacy delivery addresses (name-only)
   const orphans = db
     .prepare(
@@ -175,6 +184,7 @@ function migrateMaxwellDomain(db: Db) {
     CREATE TABLE IF NOT EXISTS mx_rolls (
       roll_id              TEXT PRIMARY KEY,
       short_code           TEXT NOT NULL UNIQUE,
+      lot_no               TEXT,
       supplier_id          INTEGER NOT NULL REFERENCES mx_suppliers(id),
       variant_code         TEXT NOT NULL,
       original_meterage    REAL NOT NULL CHECK(original_meterage > 0),
