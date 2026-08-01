@@ -11,6 +11,7 @@ import {
   Typography,
   Chip,
 } from "@mui/material";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
