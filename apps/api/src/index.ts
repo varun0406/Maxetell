@@ -4,23 +4,15 @@ import cors from "@fastify/cors";
 import { loadEnv } from "./env.js";
 import { openDb } from "./db.js";
 import { migrate } from "./schema.js";
-import { registerOrdersRoutes } from "./routes/orders.js";
-import { registerDashboardRoutes } from "./routes/dashboard.js";
-import { registerDispatchRoutes } from "./routes/dispatch.js";
-import { registerPurchaseRoutes } from "./routes/purchase.js";
-import { registerPaymentsRoutes } from "./routes/payments.js";
-import { registerMastersRoutes } from "./routes/masters.js";
-import { registerInventoryRoutes } from "./routes/inventory.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { extractBearer, parseAuthToken } from "./auth.js";
-import { registerReturnsRoutes } from "./routes/returns.js";
-import { registerJobWorkRoutes } from "./routes/jobwork.js";
-import { registerSyncRoutes } from "./routes/sync.js";
-import { registerTxMastersRoutes } from "./routes/tx_masters.js";
-import { registerTxStockRoutes } from "./routes/tx_stock.js";
-import { registerTxPackingRoutes } from "./routes/tx_packing.js";
-import { registerTxGodownRoutes } from "./routes/tx_godown.js";
-import { registerTxChallanRoutes } from "./routes/tx_challan.js";
+import { registerMxMastersRoutes } from "./routes/mx/masters.js";
+import { registerMxRollsRoutes } from "./routes/mx/rolls.js";
+import { registerMxPackingRoutes } from "./routes/mx/packing.js";
+import { registerMxParcelRoutes } from "./routes/mx/parcels.js";
+import { registerMxChallanRoutes } from "./routes/mx/challans.js";
+import { registerMxSyncRoutes } from "./routes/mx/sync.js";
+import { registerMxAnalyticsRoutes } from "./routes/mx/analytics.js";
 
 const env = loadEnv(process.env);
 
@@ -37,7 +29,7 @@ const app = Fastify({
   },
 });
 
-await app.register(cors, { origin: env.CORS_ORIGIN });
+await app.register(cors, { origin: true });
 
 function pathnameOnly(url: string): string {
   const q = url.indexOf("?");
@@ -61,24 +53,15 @@ if (authEnabled) {
   });
 }
 
-app.get("/health", async () => ({ ok: true }));
+app.get("/health", async () => ({ ok: true, product: "maxwell" }));
 
 await registerAuthRoutes(app, { db, env });
-
-await registerDashboardRoutes(app, { db });
-await registerOrdersRoutes(app, { db });
-await registerDispatchRoutes(app, { db });
-await registerPurchaseRoutes(app, { db });
-await registerPaymentsRoutes(app, { db });
-await registerMastersRoutes(app, { db });
-await registerInventoryRoutes(app, { db });
-await registerReturnsRoutes(app, { db });
-await registerJobWorkRoutes(app, { db });
-await registerSyncRoutes(app, { db });
-await registerTxMastersRoutes(app, { db });
-await registerTxStockRoutes(app, { db });
-await registerTxPackingRoutes(app, { db });
-await registerTxGodownRoutes(app, { db });
-await registerTxChallanRoutes(app, { db });
+await registerMxMastersRoutes(app, { db });
+await registerMxRollsRoutes(app, { db });
+await registerMxPackingRoutes(app, { db });
+await registerMxParcelRoutes(app, { db });
+await registerMxChallanRoutes(app, { db });
+await registerMxSyncRoutes(app, { db });
+await registerMxAnalyticsRoutes(app, { db });
 
 await app.listen({ port: env.PORT, host: env.HOST });

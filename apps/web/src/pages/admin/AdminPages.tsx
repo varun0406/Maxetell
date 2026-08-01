@@ -1,0 +1,475 @@
+import { useEffect, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Paper,
+  MenuItem,
+} from "@mui/material";
+import { api, createAppUser, deleteAppUser, fetchAppUsers, type AppUserRow } from "../../lib/api";
+import { getPrinterConfig, setPrinterConfig } from "../../lib/print/zpl";
+import { runSyncOnce } from "../../offline/syncWorker";
+import { listPendingOutbox } from "../../offline/localDb";
+
+export { AnalyticsPage } from "./AnalyticsDashboard";
+
+function TabPanel({ value, index, children }: { value: number; index: number; children: React.ReactNode }) {
+  if (value !== index) return null;
+  return <Box sx={{ pt: 2 }}>{children}</Box>;
+}
+
+export function MastersPage() {
+  const [tab, setTab] = useState(0);
+  const [items, setItems] = useState<any[]>([]);
+  const [variants, setVariants] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [workers, setWorkers] = useState<any[]>([]);
+  const [godowns, setGodowns] = useState<any[]>([]);
+  const [addresses, setAddresses] = useState<any[]>([]);
+
+  const [itemForm, setItemForm] = useState({ code: "", name: "", quality: "" });
+  const [varForm, setVarForm] = useState({ item_id: 0, variant_code: "", variant_name: "", color: "" });
+  const [supForm, setSupForm] = useState({ name: "", contact: "" });
+  const [jwForm, setJwForm] = useState({ name: "", contact: "", job_work_type: "" });
+  const [gForm, setGForm] = useState({ code: "", name: "", location: "" });
+  const [aForm, setAForm] = useState({ party_name: "", address_line: "", city: "", state: "" });
+
+  async function load() {
+    const [i, s, w, g, a] = await Promise.all([
+      api.get("/mx/items"),
+      api.get("/mx/suppliers"),
+      api.get("/mx/job-workers"),
+      api.get("/mx/godowns"),
+      api.get("/mx/addresses"),
+    ]);
+    setItems(i.data.data.items ?? []);
+    setVariants(i.data.data.variants ?? []);
+    setSuppliers(s.data.data ?? []);
+    setWorkers(w.data.data ?? []);
+    setGodowns(g.data.data ?? []);
+    setAddresses(a.data.data ?? []);
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  return (
+    <Box>
+      <Typography variant="h5" fontWeight={800} gutterBottom>
+        Masters
+      </Typography>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable">
+        <Tab label="Item Charter" />
+        <Tab label="Suppliers" />
+        <Tab label="Job Workers" />
+        <Tab label="Godowns" />
+        <Tab label="Addresses" />
+      </Tabs>
+
+      <TabPanel value={tab} index={0}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} mb={2}>
+          <TextField size="small" label="Code" value={itemForm.code} onChange={(e) => setItemForm({ ...itemForm, code: e.target.value })} />
+          <TextField size="small" label="Name" value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} />
+          <TextField size="small" label="Quality" value={itemForm.quality} onChange={(e) => setItemForm({ ...itemForm, quality: e.target.value })} />
+          <Button
+            variant="contained"
+            onClick={async () => {
+              await api.post("/mx/items", itemForm);
+              setItemForm({ code: "", name: "", quality: "" });
+              await load();
+            }}
+          >
+            Add item
+          </Button>
+        </Stack>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} mb={2}>
+          <TextField select size="small" label="Item" value={varForm.item_id} onChange={(e) => setVarForm({ ...varForm, item_id: Number(e.target.value) })} sx={{ minWidth: 160 }}>
+            {items.map((i) => (
+              <MenuItem key={i.id} value={i.id}>
+                {i.code} — {i.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField size="small" label="Variant code" value={varForm.variant_code} onChange={(e) => setVarForm({ ...varForm, variant_code: e.target.value })} />
+          <TextField size="small" label="Variant name" value={varForm.variant_name} onChange={(e) => setVarForm({ ...varForm, variant_name: e.target.value })} />
+          <TextField size="small" label="Color" value={varForm.color} onChange={(e) => setVarForm({ ...varForm, color: e.target.value })} />
+          <Button
+            variant="outlined"
+            onClick={async () => {
+              await api.post("/mx/variants", varForm);
+              setVarForm({ item_id: varForm.item_id, variant_code: "", variant_name: "", color: "" });
+              await load();
+            }}
+          >
+            Add variant
+          </Button>
+        </Stack>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Variant</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>Color</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {variants.map((v) => (
+              <TableRow key={v.id}>
+                <TableCell sx={{ fontFamily: "monospace" }}>{v.variant_code}</TableCell>
+                <TableCell>{v.variant_name}</TableCell>
+                <TableCell>{v.color}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TabPanel>
+
+      <TabPanel value={tab} index={1}>
+        <Stack direction="row" spacing={1} mb={2}>
+          <TextField size="small" label="Name" value={supForm.name} onChange={(e) => setSupForm({ ...supForm, name: e.target.value })} />
+          <TextField size="small" label="Contact" value={supForm.contact} onChange={(e) => setSupForm({ ...supForm, contact: e.target.value })} />
+          <Button
+            variant="contained"
+            onClick={async () => {
+              await api.post("/mx/suppliers", supForm);
+              setSupForm({ name: "", contact: "" });
+              await load();
+            }}
+          >
+            Add
+          </Button>
+        </Stack>
+        {suppliers.map((s) => (
+          <Chip key={s.id} label={s.name} sx={{ m: 0.5 }} />
+        ))}
+      </TabPanel>
+
+      <TabPanel value={tab} index={2}>
+        <Stack direction="row" spacing={1} mb={2}>
+          <TextField size="small" label="Name" value={jwForm.name} onChange={(e) => setJwForm({ ...jwForm, name: e.target.value })} />
+          <TextField size="small" label="Type" value={jwForm.job_work_type} onChange={(e) => setJwForm({ ...jwForm, job_work_type: e.target.value })} />
+          <Button
+            variant="contained"
+            onClick={async () => {
+              await api.post("/mx/job-workers", jwForm);
+              setJwForm({ name: "", contact: "", job_work_type: "" });
+              await load();
+            }}
+          >
+            Add
+          </Button>
+        </Stack>
+        {workers.map((w) => (
+          <Chip key={w.id} label={w.name} sx={{ m: 0.5 }} />
+        ))}
+      </TabPanel>
+
+      <TabPanel value={tab} index={3}>
+        <Stack direction="row" spacing={1} mb={2}>
+          <TextField size="small" label="Code" value={gForm.code} onChange={(e) => setGForm({ ...gForm, code: e.target.value })} />
+          <TextField size="small" label="Name" value={gForm.name} onChange={(e) => setGForm({ ...gForm, name: e.target.value })} />
+          <TextField size="small" label="Location" value={gForm.location} onChange={(e) => setGForm({ ...gForm, location: e.target.value })} />
+          <Button
+            variant="contained"
+            onClick={async () => {
+              await api.post("/mx/godowns", gForm);
+              setGForm({ code: "", name: "", location: "" });
+              await load();
+            }}
+          >
+            Add
+          </Button>
+        </Stack>
+        {godowns.map((g) => (
+          <Chip key={g.id} label={`${g.code} ${g.name}`} sx={{ m: 0.5 }} />
+        ))}
+      </TabPanel>
+
+      <TabPanel value={tab} index={4}>
+        <Stack direction="row" spacing={1} mb={2} flexWrap="wrap">
+          <TextField size="small" label="Party" value={aForm.party_name} onChange={(e) => setAForm({ ...aForm, party_name: e.target.value })} />
+          <TextField size="small" label="Address" value={aForm.address_line} onChange={(e) => setAForm({ ...aForm, address_line: e.target.value })} />
+          <TextField size="small" label="City" value={aForm.city} onChange={(e) => setAForm({ ...aForm, city: e.target.value })} />
+          <Button
+            variant="contained"
+            onClick={async () => {
+              await api.post("/mx/addresses", aForm);
+              setAForm({ party_name: "", address_line: "", city: "", state: "" });
+              await load();
+            }}
+          >
+            Add
+          </Button>
+        </Stack>
+        {addresses.map((a) => (
+          <Chip key={a.id} label={`${a.party_name} ${a.city ?? ""}`} sx={{ m: 0.5 }} />
+        ))}
+      </TabPanel>
+    </Box>
+  );
+}
+
+export function RollsPage() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [variants, setVariants] = useState<any[]>([]);
+  const [workers, setWorkers] = useState<any[]>([]);
+  const [form, setForm] = useState({ supplier_id: 0, variant_code: "", original_meterage: 100, received_date: new Date().toISOString().slice(0, 10), notes: "" });
+  const [jw, setJw] = useState({ roll_id: "", job_worker_id: 0, meter_sent: 0, outward_date: new Date().toISOString().slice(0, 10) });
+
+  async function load() {
+    const [r, s, i, w] = await Promise.all([api.get("/mx/rolls"), api.get("/mx/suppliers"), api.get("/mx/items"), api.get("/mx/job-workers")]);
+    setRows(r.data.data ?? []);
+    setSuppliers(s.data.data ?? []);
+    setVariants(i.data.data.variants ?? []);
+    setWorkers(w.data.data ?? []);
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+
+  return (
+    <Box>
+      <Typography variant="h5" fontWeight={800} gutterBottom>
+        Supplier Rolls
+      </Typography>
+      <Stack direction={{ xs: "column", md: "row" }} spacing={1} mb={2} flexWrap="wrap">
+        <TextField select size="small" label="Supplier" value={form.supplier_id} onChange={(e) => setForm({ ...form, supplier_id: Number(e.target.value) })} sx={{ minWidth: 160 }}>
+          {suppliers.map((s) => (
+            <MenuItem key={s.id} value={s.id}>
+              {s.name}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField select size="small" label="Variant" value={form.variant_code} onChange={(e) => setForm({ ...form, variant_code: e.target.value })} sx={{ minWidth: 160 }}>
+          {variants.map((v) => (
+            <MenuItem key={v.variant_code} value={v.variant_code}>
+              {v.variant_code} {v.variant_name}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField size="small" type="number" label="Meters" value={form.original_meterage} onChange={(e) => setForm({ ...form, original_meterage: Number(e.target.value) })} />
+        <TextField size="small" type="date" label="Date" InputLabelProps={{ shrink: true }} value={form.received_date} onChange={(e) => setForm({ ...form, received_date: e.target.value })} />
+        <Button
+          variant="contained"
+          onClick={async () => {
+            await api.post("/mx/rolls", form);
+            await load();
+          }}
+        >
+          Stock In
+        </Button>
+      </Stack>
+
+      <Typography fontWeight={700} mb={1}>
+        Send to job work
+      </Typography>
+      <Stack direction="row" spacing={1} mb={2} flexWrap="wrap">
+        <TextField select size="small" label="Roll" value={jw.roll_id} onChange={(e) => setJw({ ...jw, roll_id: e.target.value })} sx={{ minWidth: 180 }}>
+          {rows.filter((r) => r.remaining_meterage > 0).map((r) => (
+            <MenuItem key={r.roll_id} value={r.roll_id}>
+              {r.short_code} ({r.remaining_meterage}m)
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField select size="small" label="Worker" value={jw.job_worker_id} onChange={(e) => setJw({ ...jw, job_worker_id: Number(e.target.value) })} sx={{ minWidth: 160 }}>
+          {workers.map((w) => (
+            <MenuItem key={w.id} value={w.id}>
+              {w.name}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField size="small" type="number" label="Meters" value={jw.meter_sent || ""} onChange={(e) => setJw({ ...jw, meter_sent: Number(e.target.value) })} />
+        <Button
+          variant="outlined"
+          onClick={async () => {
+            await api.post("/mx/job-work/out", jw);
+            await load();
+          }}
+        >
+          Send out
+        </Button>
+      </Stack>
+
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Roll</TableCell>
+            <TableCell>Supplier</TableCell>
+            <TableCell>Variant</TableCell>
+            <TableCell>Remaining</TableCell>
+            <TableCell>Status</TableCell>
+            <TableCell>Date</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.map((r) => (
+            <TableRow key={r.roll_id}>
+              <TableCell sx={{ fontFamily: "monospace" }}>{r.short_code}</TableCell>
+              <TableCell>{r.supplier_name}</TableCell>
+              <TableCell>{r.variant_code}</TableCell>
+              <TableCell>
+                {r.remaining_meterage} / {r.original_meterage}
+              </TableCell>
+              <TableCell>
+                <Chip size="small" label={r.status} />
+              </TableCell>
+              <TableCell>{r.received_date}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
+  );
+}
+
+export function SettingsSyncPage() {
+  const [host, setHost] = useState(getPrinterConfig()?.host ?? "");
+  const [port, setPort] = useState(getPrinterConfig()?.port ?? 9100);
+  const [pending, setPending] = useState(0);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<any[]>([]);
+
+  async function refresh() {
+    setPending((await listPendingOutbox()).length);
+    try {
+      const c = await api.get("/mx/sync/conflicts");
+      setConflicts(c.data.data ?? []);
+    } catch {
+      /* auth/offline */
+    }
+  }
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  return (
+    <Box>
+      <Typography variant="h5" fontWeight={800} gutterBottom>
+        Device & Sync
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        Thermal printer (ZPL LAN) and offline outbox
+      </Typography>
+      <Stack direction="row" spacing={1} mb={2}>
+        <TextField size="small" label="Printer host" value={host} onChange={(e) => setHost(e.target.value)} />
+        <TextField size="small" type="number" label="Port" value={port} onChange={(e) => setPort(Number(e.target.value))} sx={{ width: 100 }} />
+        <Button
+          variant="contained"
+          onClick={() => {
+            setPrinterConfig(host ? { host, port } : null);
+            setMsg("Printer saved");
+          }}
+        >
+          Save printer
+        </Button>
+      </Stack>
+      <Stack direction="row" spacing={1} mb={2} alignItems="center">
+        <Chip label={`Pending sync: ${pending}`} />
+        <Button
+          variant="outlined"
+          onClick={async () => {
+            const r = await runSyncOnce();
+            setMsg(`Pushed ${r.pushed}, pulled=${r.pulled}, conflicts=${r.conflicts}`);
+            await refresh();
+          }}
+        >
+          Sync now
+        </Button>
+      </Stack>
+      {msg && <Alert severity="info">{msg}</Alert>}
+      <Typography fontWeight={700} mt={2} mb={1}>
+        Open conflicts
+      </Typography>
+      {conflicts.map((c) => (
+        <Paper key={c.id} sx={{ p: 1.5, mb: 1 }}>
+          <Typography variant="body2">
+            {c.entity} · {c.client_id.slice(0, 8)}… — {c.reason}
+          </Typography>
+          <Button
+            size="small"
+            onClick={async () => {
+              await api.post(`/mx/sync/conflicts/${c.id}/resolve`, { status: "resolved" });
+              await refresh();
+            }}
+          >
+            Resolve
+          </Button>
+        </Paper>
+      ))}
+    </Box>
+  );
+}
+
+export function UsersAdminPage() {
+  const [users, setUsers] = useState<AppUserRow[]>([]);
+  const [form, setForm] = useState({ username: "", password: "", role: "user" });
+  async function load() {
+    setUsers(await fetchAppUsers());
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+  return (
+    <Box>
+      <Typography variant="h5" fontWeight={800} gutterBottom>
+        Users
+      </Typography>
+      <Stack direction="row" spacing={1} mb={2}>
+        <TextField size="small" label="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+        <TextField size="small" type="password" label="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <TextField select size="small" label="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} sx={{ minWidth: 120 }}>
+          {["admin", "user", "packing", "godown", "floor"].map((r) => (
+            <MenuItem key={r} value={r}>
+              {r}
+            </MenuItem>
+          ))}
+        </TextField>
+        <Button
+          variant="contained"
+          onClick={async () => {
+            await createAppUser(form);
+            setForm({ username: "", password: "", role: "user" });
+            await load();
+          }}
+        >
+          Create
+        </Button>
+      </Stack>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>User</TableCell>
+            <TableCell>Role</TableCell>
+            <TableCell />
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {users.map((u) => (
+            <TableRow key={u.id}>
+              <TableCell>{u.username}</TableCell>
+              <TableCell>{u.role}</TableCell>
+              <TableCell>
+                <Button size="small" color="error" onClick={async () => { await deleteAppUser(u.id); await load(); }}>
+                  Delete
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
+  );
+}

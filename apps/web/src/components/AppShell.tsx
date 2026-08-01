@@ -9,52 +9,33 @@ import {
   ListItemText,
   Toolbar,
   Typography,
+  Chip,
 } from "@mui/material";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-import { Outlet, useNavigate } from "react-router-dom";
-import { clearAuthToken } from "../lib/auth";
-import { useAuthGate } from "./AuthGate.tsx";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
-import TableChartOutlinedIcon from "@mui/icons-material/TableChartOutlined";
-import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
-import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
-import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
-import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
-import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
-import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
-import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
+import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
 import StyleOutlinedIcon from "@mui/icons-material/StyleOutlined";
-import WarehouseOutlinedIcon from "@mui/icons-material/WarehouseOutlined";
 import ContentCutOutlinedIcon from "@mui/icons-material/ContentCutOutlined";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
-import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
-import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
-import { Link, useLocation } from "react-router-dom";
+import SyncOutlinedIcon from "@mui/icons-material/SyncOutlined";
+import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import { clearAuthToken } from "../lib/auth";
+import { useAuthGate } from "./AuthGate.tsx";
+import { useEffect } from "react";
+import { startSyncWorker } from "../offline/syncWorker";
 
 const drawerWidth = 260;
 
 const nav = [
-  { to: "/", label: "Dashboard", icon: <DashboardOutlinedIcon /> },
-  { to: "/orders", label: "Orders", icon: <TableChartOutlinedIcon /> },
-  { to: "/orders/new", label: "Create Order", icon: <TableChartOutlinedIcon /> },
-  { to: "/dispatch", label: "Dispatch", icon: <LocalShippingOutlinedIcon /> },
-  { to: "/purchase", label: "Purchase (PO)", icon: <ShoppingCartOutlinedIcon /> },
-  { to: "/billing", label: "Billing", icon: <ReceiptLongOutlinedIcon /> },
-  { to: "/inventory", label: "Inventory", icon: <Inventory2OutlinedIcon /> },
-  { to: "/payments", label: "Payments", icon: <PaymentsOutlinedIcon /> },
-  { to: "/returns", label: "Returns", icon: <ReceiptLongOutlinedIcon /> },
-  { to: "/jobwork", label: "Job Work", icon: <AssignmentOutlinedIcon /> },
-  { to: "/jobwork-out", label: "Job Work Out", icon: <AssignmentOutlinedIcon /> },
-  { to: "/users", label: "Users", icon: <PersonAddOutlinedIcon /> },
-];
-
-const txNav = [
-  { to: "/tx/items", label: "Item Charter", icon: <CategoryOutlinedIcon /> },
-  { to: "/tx/masters", label: "Masters", icon: <TuneOutlinedIcon /> },
-  { to: "/tx/stock", label: "Stock Ledger", icon: <StyleOutlinedIcon /> },
-  { to: "/tx/packing", label: "Packing", icon: <ContentCutOutlinedIcon /> },
-  { to: "/tx/godown", label: "Godown", icon: <WarehouseOutlinedIcon /> },
-  { to: "/tx/challans", label: "Delivery Challan", icon: <ArticleOutlinedIcon /> },
+  { to: "/", label: "Stock Dashboard", icon: <DashboardOutlinedIcon /> },
+  { to: "/masters", label: "Masters", icon: <CategoryOutlinedIcon /> },
+  { to: "/rolls", label: "Supplier Rolls", icon: <StyleOutlinedIcon /> },
+  { to: "/challans", label: "Delivery Challans", icon: <ArticleOutlinedIcon /> },
+  { to: "/challans/new", label: "New Challan", icon: <ArticleOutlinedIcon /> },
+  { to: "/floor/cutting", label: "Floor App", icon: <ContentCutOutlinedIcon />, highlight: true },
+  { to: "/device", label: "Device & Sync", icon: <SyncOutlinedIcon /> },
+  { to: "/users", label: "Users", icon: <PersonAddOutlinedIcon />, adminOnly: true },
 ];
 
 export function AppShell() {
@@ -63,6 +44,10 @@ export function AppShell() {
   const authGate = useAuthGate();
   const authEnabled = authGate.enabled;
   const showUsersNav = authEnabled && authGate.session?.role === "admin";
+
+  useEffect(() => {
+    startSyncWorker(15000);
+  }, []);
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
@@ -77,12 +62,13 @@ export function AppShell() {
         <Toolbar sx={{ px: 2, flexDirection: "column", alignItems: "stretch", gap: 1, py: 2 }}>
           <Box>
             <Typography fontWeight={900} lineHeight={1.1}>
-              Jigness ERP
+              Maxwell Trading
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Metals trading / manufacturing
+              Offline-first cloth stock
             </Typography>
           </Box>
+          <Chip size="small" label={navigator.onLine ? "Online" : "Offline"} color={navigator.onLine ? "success" : "warning"} />
           {authEnabled ? (
             <Button
               size="small"
@@ -100,33 +86,23 @@ export function AppShell() {
         <Divider />
         <List dense sx={{ px: 1, py: 1 }}>
           {nav
-            .filter((n) => (n.to === "/users" ? showUsersNav : true))
+            .filter((n) => (n.adminOnly ? showUsersNav : true))
             .map((n) => (
-            <ListItemButton
-              key={n.to}
-              component={Link}
-              to={n.to}
-              selected={loc.pathname === n.to}
-              sx={{ borderRadius: 2, mb: 0.5 }}
-            >
-              <ListItemIcon sx={{ minWidth: 36 }}>{n.icon}</ListItemIcon>
-              <ListItemText primary={n.label} primaryTypographyProps={{ fontWeight: 600 }} />
-            </ListItemButton>
-          ))}
-          <Divider sx={{ my: 1 }} />
-          <Typography variant="caption" color="text.secondary" sx={{ px: 1, fontWeight: 700, letterSpacing: 1 }}>MAXWELL TRADING</Typography>
-          {txNav.map((n) => (
-            <ListItemButton
-              key={n.to}
-              component={Link}
-              to={n.to}
-              selected={loc.pathname === n.to}
-              sx={{ borderRadius: 2, mb: 0.5, mt: 0.5 }}
-            >
-              <ListItemIcon sx={{ minWidth: 36 }}>{n.icon}</ListItemIcon>
-              <ListItemText primary={n.label} primaryTypographyProps={{ fontWeight: 600 }} />
-            </ListItemButton>
-          ))}
+              <ListItemButton
+                key={n.to}
+                component={Link}
+                to={n.to}
+                selected={n.to === "/" ? loc.pathname === "/" : loc.pathname === n.to || loc.pathname.startsWith(n.to + "/")}
+                sx={{
+                  borderRadius: 2,
+                  mb: 0.5,
+                  ...(n.highlight ? { bgcolor: "primary.main", color: "primary.contrastText", "&:hover": { bgcolor: "primary.dark" }, "&.Mui-selected": { bgcolor: "primary.dark" } } : {}),
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 36 }}>{n.icon}</ListItemIcon>
+                <ListItemText primary={n.label} primaryTypographyProps={{ fontWeight: 600 }} />
+              </ListItemButton>
+            ))}
         </List>
       </Drawer>
 
@@ -136,4 +112,3 @@ export function AppShell() {
     </Box>
   );
 }
-

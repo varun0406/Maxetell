@@ -74,7 +74,7 @@ export function LoginPage() {
       <Card sx={{ maxWidth: 440, width: "100%" }}>
         <CardContent sx={{ p: 3 }}>
           <Typography fontWeight={900} variant="h5" gutterBottom>
-            Jigness ERP
+            Maxwell Trading
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             Sign in to continue

@@ -1,290 +1,10 @@
 import type { Db } from "./db.js";
+import { seedMaxwellDemo } from "./seed.js";
 
 export function migrate(db: Db) {
-  db.exec(`
-CREATE TABLE IF NOT EXISTS clients (
-  id INTEGER PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE
-);
-
-CREATE TABLE IF NOT EXISTS suppliers (
-  id INTEGER PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE
-);
-
-CREATE TABLE IF NOT EXISTS products (
-  id INTEGER PRIMARY KEY,
-  size TEXT NOT NULL,
-  item TEXT NOT NULL,
-  grade TEXT NOT NULL,
-  UNIQUE(size, item, grade)
-);
-
--- Core lifecycle row (WO)
-CREATE TABLE IF NOT EXISTS orders (
-  id INTEGER PRIMARY KEY,
-  wo_no TEXT NOT NULL UNIQUE,
-  order_date TEXT NOT NULL, -- ISO yyyy-mm-dd
-  client_id INTEGER NOT NULL REFERENCES clients(id),
-  product_id INTEGER NOT NULL REFERENCES products(id),
-  length_nos TEXT,
-  order_kgs REAL NOT NULL CHECK(order_kgs >= 0),
-
-  -- Sales/Order reference (optional)
-  or_no TEXT,
-  sales_date TEXT,
-  weight_sold REAL DEFAULT 0 CHECK(weight_sold >= 0),
-  sales_return REAL DEFAULT 0 CHECK(sales_return >= 0),
-
-  -- Billing
-  avg_cost REAL DEFAULT 0 CHECK(avg_cost >= 0),
-  bill_rate REAL DEFAULT 0 CHECK(bill_rate >= 0),
-
-  -- Invoice / payment summary fields (derived by app logic, kept denormalized for speed)
-  invoice_no TEXT,
-  invoice_total REAL DEFAULT 0 CHECK(invoice_total >= 0),
-  paid_amount REAL DEFAULT 0 CHECK(paid_amount >= 0),
-
-  remarks TEXT,
-
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TRIGGER IF NOT EXISTS orders_updated_at
-AFTER UPDATE ON orders
-BEGIN
-  UPDATE orders SET updated_at = datetime('now') WHERE id = NEW.id;
-END;
-
-CREATE TABLE IF NOT EXISTS dispatch_entries (
-  id INTEGER PRIMARY KEY,
-  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  order_line_item_id INTEGER REFERENCES order_line_items(id) ON DELETE CASCADE,
-  dispatch_date TEXT NOT NULL,
-  dispatch_weight REAL NOT NULL CHECK(dispatch_weight > 0),
-  dispatch_pcs INTEGER DEFAULT 0 CHECK(dispatch_pcs >= 0),
-  bundle_no TEXT,
-  transport TEXT,
-  sales_rate REAL DEFAULT 0 CHECK(sales_rate >= 0),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS dispatch_tally_bills (
-  id INTEGER PRIMARY KEY,
-  dispatch_entry_id INTEGER NOT NULL REFERENCES dispatch_entries(id) ON DELETE CASCADE,
-  bill_no TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS purchase_entries (
-  id INTEGER PRIMARY KEY,
-  supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
-  product_id INTEGER REFERENCES products(id),
-  po_no TEXT,
-  purchase_date TEXT NOT NULL,
-  weight REAL NOT NULL CHECK(weight > 0),
-  rate REAL NOT NULL CHECK(rate >= 0),
-  received_weight REAL DEFAULT 0 CHECK(received_weight >= 0),
-  debit_note TEXT,
-  rec_note TEXT,
-  remarks TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- Goods received against a raw-material PO (multiple lines per PO)
-CREATE TABLE IF NOT EXISTS purchase_receipts (
-  id INTEGER PRIMARY KEY,
-  purchase_entry_id INTEGER NOT NULL REFERENCES purchase_entries(id) ON DELETE CASCADE,
-  receipt_date TEXT NOT NULL,
-  weight_received REAL NOT NULL CHECK(weight_received > 0),
-  client_invoice_no TEXT,
-  note TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS payments (
-  id INTEGER PRIMARY KEY,
-  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  payment_date TEXT NOT NULL,
-  amount REAL NOT NULL CHECK(amount > 0),
-  note TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- Line items: one WO can have many products; AVE / BILL RATE per line
-CREATE TABLE IF NOT EXISTS order_line_items (
-  id INTEGER PRIMARY KEY,
-  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  size TEXT NOT NULL,
-  item TEXT NOT NULL,
-  grade TEXT NOT NULL,
-  length_nos TEXT,
-  order_kgs REAL NOT NULL CHECK(order_kgs >= 0),
-  order_pcs INTEGER DEFAULT 0 CHECK(order_pcs >= 0),
-  bill_rate REAL DEFAULT 0 CHECK(bill_rate >= 0),
-  avg_cost REAL DEFAULT 0 CHECK(avg_cost >= 0),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-`);
-  migrateOrderLines(db);
-  migratePurchaseSchema(db);
-  migrateDispatchSchema(db);
-  migrateAppSettings(db);
   migrateAppUsers(db);
-  migrateJobWorkOut(db);
-  migratePurchaseReceiptsInvoice(db);
-  migrateMaxwellTrading(db);
-}
-
-// ─── Maxwell Trading — Textile Stock Management ───────────────────────────────
-function migrateMaxwellTrading(db: Db) {
-  db.exec(`
-    -- Parent items  e.g. code="1"  name="Carens"
-    CREATE TABLE IF NOT EXISTS tx_items (
-      id          INTEGER PRIMARY KEY,
-      code        TEXT NOT NULL UNIQUE,   -- 2-3 chars, admin-managed
-      name        TEXT NOT NULL UNIQUE,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Variants/colours  e.g. variant_code="1-a"  variant_name="Light Blue"
-    CREATE TABLE IF NOT EXISTS tx_item_variants (
-      id            INTEGER PRIMARY KEY,
-      item_id       INTEGER NOT NULL REFERENCES tx_items(id) ON DELETE CASCADE,
-      variant_code  TEXT NOT NULL UNIQUE,  -- full code used everywhere
-      variant_name  TEXT NOT NULL,
-      color         TEXT,
-      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Fabric-supplying companies
-    CREATE TABLE IF NOT EXISTS tx_companies (
-      id          INTEGER PRIMARY KEY,
-      name        TEXT NOT NULL UNIQUE,
-      contact     TEXT,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Job-work mills
-    CREATE TABLE IF NOT EXISTS tx_mills (
-      id            INTEGER PRIMARY KEY,
-      name          TEXT NOT NULL UNIQUE,
-      contact       TEXT,
-      job_work_type TEXT,
-      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Godowns
-    CREATE TABLE IF NOT EXISTS tx_godowns (
-      id          INTEGER PRIMARY KEY,
-      code        TEXT NOT NULL UNIQUE,
-      name        TEXT NOT NULL,
-      location    TEXT,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Delivery addresses / parties
-    CREATE TABLE IF NOT EXISTS tx_delivery_addresses (
-      id           INTEGER PRIMARY KEY,
-      party_name   TEXT NOT NULL,
-      address_line TEXT,
-      city         TEXT,
-      state        TEXT,
-      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Stock In lots (inward from company) — no rate
-    CREATE TABLE IF NOT EXISTS tx_stock_in (
-      id            INTEGER PRIMARY KEY,
-      lot_no        TEXT NOT NULL UNIQUE,
-      company_id    INTEGER NOT NULL REFERENCES tx_companies(id),
-      variant_code  TEXT NOT NULL REFERENCES tx_item_variants(variant_code),
-      meter         REAL NOT NULL CHECK(meter > 0),
-      received_date TEXT NOT NULL,
-      notes         TEXT,
-      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Mill Job Work Out (sent for processing)
-    CREATE TABLE IF NOT EXISTS tx_mill_out (
-      id             INTEGER PRIMARY KEY,
-      lot_no         TEXT NOT NULL UNIQUE,
-      mill_id        INTEGER NOT NULL REFERENCES tx_mills(id),
-      variant_code   TEXT NOT NULL,
-      meter          REAL NOT NULL CHECK(meter > 0),
-      ref_stock_in_id INTEGER REFERENCES tx_stock_in(id),
-      sent_date      TEXT NOT NULL,
-      notes          TEXT,
-      status         TEXT NOT NULL DEFAULT 'pending'
-                     CHECK(status IN ('pending','received')),
-      created_at     TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Mill Return (received back after processing)
-    CREATE TABLE IF NOT EXISTS tx_mill_return (
-      id            INTEGER PRIMARY KEY,
-      mill_out_id   INTEGER NOT NULL REFERENCES tx_mill_out(id),
-      variant_code  TEXT NOT NULL,
-      meter         REAL NOT NULL CHECK(meter > 0),
-      received_date TEXT NOT NULL,
-      notes         TEXT,
-      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Packing entries (split stock into pieces; faulty status tracked here)
-    CREATE TABLE IF NOT EXISTS tx_packing (
-      id            INTEGER PRIMARY KEY,
-      packing_id    TEXT NOT NULL UNIQUE,   -- PKG-YYYYMMDD-NNN
-      source_type   TEXT NOT NULL CHECK(source_type IN ('stock_in','mill_return')),
-      source_id     INTEGER NOT NULL,
-      variant_code  TEXT NOT NULL,
-      meter         REAL NOT NULL CHECK(meter > 0),
-      packing_date  TEXT NOT NULL,
-      created_by    INTEGER REFERENCES app_users(id),
-      status        TEXT NOT NULL DEFAULT 'packed'
-                    CHECK(status IN ('packed','in_godown','dispatched','faulty')),
-      notes         TEXT,
-      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Godown stock (Packing IDs in godown)
-    CREATE TABLE IF NOT EXISTS tx_godown_stock (
-      id            INTEGER PRIMARY KEY,
-      packing_id    TEXT NOT NULL UNIQUE REFERENCES tx_packing(packing_id),
-      godown_id     INTEGER NOT NULL REFERENCES tx_godowns(id),
-      received_date TEXT NOT NULL,
-      received_by   INTEGER REFERENCES app_users(id),
-      status        TEXT NOT NULL DEFAULT 'in_godown'
-                    CHECK(status IN ('in_godown','dispatched')),
-      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Delivery Challans (Admin creates, Floor Manager dispatches)
-    CREATE TABLE IF NOT EXISTS tx_challans (
-      id          INTEGER PRIMARY KEY,
-      challan_no  TEXT NOT NULL UNIQUE,
-      challan_date TEXT NOT NULL,
-      address_id  INTEGER REFERENCES tx_delivery_addresses(id),
-      created_by  INTEGER REFERENCES app_users(id),
-      assigned_to INTEGER REFERENCES app_users(id),
-      status      TEXT NOT NULL DEFAULT 'created'
-                  CHECK(status IN ('created','assigned','dispatched','delivered')),
-      notes       TEXT,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Challan line items
-    CREATE TABLE IF NOT EXISTS tx_challan_items (
-      id           INTEGER PRIMARY KEY,
-      challan_id   INTEGER NOT NULL REFERENCES tx_challans(id) ON DELETE CASCADE,
-      packing_id   TEXT NOT NULL REFERENCES tx_packing(packing_id),
-      variant_code TEXT NOT NULL,
-      meter        REAL NOT NULL,
-      added_by     INTEGER REFERENCES app_users(id),
-      added_at     TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
+  migrateMaxwellDomain(db);
+  seedMaxwellDemo(db);
 }
 
 function migrateAppUsers(db: Db) {
@@ -293,419 +13,260 @@ CREATE TABLE IF NOT EXISTS app_users (
   id INTEGER PRIMARY KEY,
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('admin','user')),
+  role TEXT NOT NULL DEFAULT 'user',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
 }
 
-function migrateAppSettings(db: Db) {
+/** Maxwell cloth trading domain — offline-first lineage model */
+function migrateMaxwellDomain(db: Db) {
   db.exec(`
-CREATE TABLE IF NOT EXISTS app_settings (
-  key TEXT PRIMARY KEY,
-  value_real REAL NOT NULL DEFAULT 0
-);
-`);
-  db.exec(`INSERT OR IGNORE INTO app_settings(key, value_real) VALUES ('opening_stock_kgs', 0);`);
-  db.exec(`INSERT OR IGNORE INTO app_settings(key, value_real) VALUES ('minimum_stock_kgs', 0);`);
+    CREATE TABLE IF NOT EXISTS mx_items (
+      id          INTEGER PRIMARY KEY,
+      code        TEXT NOT NULL UNIQUE,
+      name        TEXT NOT NULL UNIQUE,
+      quality     TEXT,
+      deleted_at  TEXT,
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-  db.exec(`
-CREATE TABLE IF NOT EXISTS sales_returns (
-  id INTEGER PRIMARY KEY,
-  order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
-  product_id INTEGER REFERENCES products(id),
-  return_date TEXT NOT NULL,
-  weight REAL NOT NULL CHECK(weight > 0),
-  note TEXT,
-  remarks TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    CREATE TABLE IF NOT EXISTS mx_item_variants (
+      id            INTEGER PRIMARY KEY,
+      item_id       INTEGER NOT NULL REFERENCES mx_items(id),
+      variant_code  TEXT NOT NULL UNIQUE,
+      variant_name  TEXT NOT NULL,
+      color         TEXT,
+      deleted_at    TEXT,
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-CREATE TABLE IF NOT EXISTS purchase_returns (
-  id INTEGER PRIMARY KEY,
-  purchase_entry_id INTEGER NOT NULL REFERENCES purchase_entries(id) ON DELETE CASCADE,
-  return_date TEXT NOT NULL,
-  weight REAL NOT NULL CHECK(weight > 0),
-  note TEXT,
-  remarks TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    CREATE TABLE IF NOT EXISTS mx_suppliers (
+      id          INTEGER PRIMARY KEY,
+      name        TEXT NOT NULL UNIQUE,
+      contact     TEXT,
+      deleted_at  TEXT,
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-CREATE TABLE IF NOT EXISTS job_work_clients (
-  id INTEGER PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    CREATE TABLE IF NOT EXISTS mx_job_workers (
+      id            INTEGER PRIMARY KEY,
+      name          TEXT NOT NULL UNIQUE,
+      contact       TEXT,
+      job_work_type TEXT,
+      deleted_at    TEXT,
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-CREATE TABLE IF NOT EXISTS job_work_inward (
-  id INTEGER PRIMARY KEY,
-  client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
-  challan_date TEXT NOT NULL,
-  description TEXT NOT NULL,
-  qty REAL NOT NULL CHECK(qty >= 0),
-  short_qty REAL DEFAULT 0 CHECK(short_qty >= 0),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    CREATE TABLE IF NOT EXISTS mx_godowns (
+      id          INTEGER PRIMARY KEY,
+      code        TEXT NOT NULL UNIQUE,
+      name        TEXT NOT NULL,
+      location    TEXT,
+      deleted_at  TEXT,
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-CREATE TABLE IF NOT EXISTS job_work_outward (
-  id INTEGER PRIMARY KEY,
-  client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
-  dispatch_date TEXT NOT NULL,
-  dispatch_qty REAL NOT NULL CHECK(dispatch_qty >= 0),
-  process_loss REAL DEFAULT 0 CHECK(process_loss >= 0),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    CREATE TABLE IF NOT EXISTS mx_delivery_addresses (
+      id           INTEGER PRIMARY KEY,
+      party_name   TEXT NOT NULL,
+      address_line TEXT,
+      city         TEXT,
+      state        TEXT,
+      deleted_at   TEXT,
+      updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-CREATE TABLE IF NOT EXISTS job_work_out_sent (
-  id INTEGER PRIMARY KEY,
-  client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
-  challan_date TEXT NOT NULL,
-  description TEXT NOT NULL,
-  qty REAL NOT NULL CHECK(qty >= 0),
-  short_qty REAL DEFAULT 0 CHECK(short_qty >= 0),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+    CREATE TABLE IF NOT EXISTS mx_rolls (
+      roll_id              TEXT PRIMARY KEY,
+      short_code           TEXT NOT NULL UNIQUE,
+      supplier_id          INTEGER NOT NULL REFERENCES mx_suppliers(id),
+      variant_code         TEXT NOT NULL,
+      original_meterage    REAL NOT NULL CHECK(original_meterage > 0),
+      remaining_meterage   REAL NOT NULL CHECK(remaining_meterage >= 0),
+      status               TEXT NOT NULL DEFAULT 'inward'
+                           CHECK(status IN ('inward','at_job_work','in_cutting','depleted')),
+      received_date        TEXT NOT NULL,
+      notes                TEXT,
+      version              INTEGER NOT NULL DEFAULT 1,
+      deleted_at           TEXT,
+      updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at           TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-CREATE TABLE IF NOT EXISTS job_work_out_receipt (
-  id INTEGER PRIMARY KEY,
-  client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
-  receipt_date TEXT NOT NULL,
-  receipt_qty REAL NOT NULL CHECK(receipt_qty >= 0),
-  process_loss REAL DEFAULT 0 CHECK(process_loss >= 0),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-`);
-  migrateSalesReturns(db);
-  migrateJobWorkFields(db);
-}
+    CREATE TABLE IF NOT EXISTS mx_job_work (
+      job_work_id      TEXT PRIMARY KEY,
+      roll_id          TEXT NOT NULL REFERENCES mx_rolls(roll_id),
+      job_worker_id    INTEGER NOT NULL REFERENCES mx_job_workers(id),
+      outward_date     TEXT NOT NULL,
+      inward_date      TEXT,
+      meter_sent       REAL NOT NULL CHECK(meter_sent > 0),
+      meter_returned   REAL DEFAULT 0 CHECK(meter_returned >= 0),
+      processed_state  TEXT NOT NULL DEFAULT 'outward'
+                       CHECK(processed_state IN ('outward','inward','closed')),
+      notes            TEXT,
+      version          INTEGER NOT NULL DEFAULT 1,
+      deleted_at       TEXT,
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-function migrateSalesReturns(db: Db) {
-  if (!columnExists(db, "sales_returns", "product_id")) {
-    db.exec(`ALTER TABLE sales_returns RENAME TO sales_returns_old`);
-    db.exec(`
-      CREATE TABLE sales_returns (
-        id INTEGER PRIMARY KEY,
-        order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
-        product_id INTEGER REFERENCES products(id),
-        return_date TEXT NOT NULL,
-        weight REAL NOT NULL CHECK(weight > 0),
-        note TEXT,
-        remarks TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `);
-    db.exec(`
-      INSERT INTO sales_returns (id, order_id, product_id, return_date, weight, note, remarks, created_at)
-      SELECT id, order_id, NULL, return_date, weight, note, remarks, created_at FROM sales_returns_old
-    `);
-    db.exec(`DROP TABLE sales_returns_old`);
-  }
-}
+    CREATE TABLE IF NOT EXISTS mx_packings (
+      packing_id       TEXT PRIMARY KEY,
+      short_code       TEXT NOT NULL UNIQUE,
+      parent_roll_id   TEXT NOT NULL REFERENCES mx_rolls(roll_id),
+      length_meters    REAL NOT NULL CHECK(length_meters > 0),
+      variant_code     TEXT NOT NULL,
+      godown_id        INTEGER REFERENCES mx_godowns(id),
+      location_hint    TEXT,
+      parcel_id        TEXT,
+      status           TEXT NOT NULL DEFAULT 'packed'
+                       CHECK(status IN ('packed','in_godown','consolidated','dispatched','faulty')),
+      packing_date     TEXT NOT NULL,
+      notes            TEXT,
+      device_id        TEXT,
+      version          INTEGER NOT NULL DEFAULT 1,
+      deleted_at       TEXT,
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-function migrateOrderLines(db: Db) {
-  if (!columnExists(db, "order_line_items", "order_pcs")) {
-    db.exec(`ALTER TABLE order_line_items ADD COLUMN order_pcs INTEGER DEFAULT 0 CHECK(order_pcs >= 0);`);
-  }
-  const lineCount = (db.prepare(`SELECT COUNT(1) AS c FROM order_line_items`).get() as { c: number }).c;
-  const orderCount = (db.prepare(`SELECT COUNT(1) AS c FROM orders`).get() as { c: number }).c;
-  if (lineCount === 0 && orderCount > 0) {
-    db.exec(`
-INSERT INTO order_line_items (order_id, size, item, grade, length_nos, order_kgs, bill_rate, avg_cost)
-SELECT o.id, p.size, p.item, p.grade, o.length_nos, o.order_kgs, o.bill_rate, o.avg_cost
-FROM orders o
-JOIN products p ON p.id = o.product_id;
-`);
-  }
+    CREATE INDEX IF NOT EXISTS idx_mx_packings_roll ON mx_packings(parent_roll_id);
+    CREATE INDEX IF NOT EXISTS idx_mx_packings_status ON mx_packings(status);
+    CREATE INDEX IF NOT EXISTS idx_mx_packings_updated ON mx_packings(updated_at);
 
-  if (!columnExists(db, "orders", "client_po_no")) {
-    db.exec(`ALTER TABLE orders ADD COLUMN client_po_no TEXT;`);
-  }
+    CREATE TABLE IF NOT EXISTS mx_parcels (
+      parcel_id      TEXT PRIMARY KEY,
+      short_code     TEXT NOT NULL UNIQUE,
+      total_meters   REAL NOT NULL DEFAULT 0,
+      status         TEXT NOT NULL DEFAULT 'open'
+                     CHECK(status IN ('open','sealed','dispatched')),
+      device_id      TEXT,
+      version        INTEGER NOT NULL DEFAULT 1,
+      deleted_at     TEXT,
+      updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-  db.exec(`
-UPDATE orders SET order_kgs = (
-  SELECT COALESCE(SUM(oli.order_kgs), 0) FROM order_line_items oli WHERE oli.order_id = orders.id
-) WHERE EXISTS (SELECT 1 FROM order_line_items o2 WHERE o2.order_id = orders.id);
-`);
+    CREATE TABLE IF NOT EXISTS mx_parcel_items (
+      parcel_id   TEXT NOT NULL REFERENCES mx_parcels(parcel_id),
+      packing_id  TEXT NOT NULL UNIQUE REFERENCES mx_packings(packing_id),
+      PRIMARY KEY (parcel_id, packing_id)
+    );
 
-  db.exec(`DROP VIEW IF EXISTS v_orders;`);
-  db.exec(`
-CREATE VIEW v_orders AS
-SELECT
-  oli.id AS id,
-  o.id AS order_id,
-  o.wo_no,
-  o.client_po_no,
-  o.order_date,
-  c.name AS client_name,
-  oli.size,
-  oli.item,
-  oli.grade,
-  oli.length_nos,
-  oli.order_kgs,
-  oli.order_pcs,
-  COALESCE((SELECT SUM(de.dispatch_weight) FROM dispatch_entries de WHERE de.order_line_item_id = oli.id), 0) AS dispatch_weight,
-  COALESCE((SELECT SUM(de.packing_weight) FROM dispatch_entries de WHERE de.order_line_item_id = oli.id), 0) AS packing_weight,
-  COALESCE((SELECT SUM(de.dispatch_pcs) FROM dispatch_entries de WHERE de.order_line_item_id = oli.id), 0) AS dispatch_pcs,
-  (
-    oli.order_kgs
-    - COALESCE((SELECT SUM(de.dispatch_weight) FROM dispatch_entries de WHERE de.order_line_item_id = oli.id), 0)
-  ) AS balance_kgs,
-  (
-    oli.order_pcs
-    - COALESCE((SELECT SUM(de.dispatch_pcs) FROM dispatch_entries de WHERE de.order_line_item_id = oli.id), 0)
-  ) AS balance_pcs,
-  oli.avg_cost,
-  oli.bill_rate,
-  (oli.bill_rate - oli.avg_cost) AS profit_per_kg,
-  o.or_no,
-  o.sales_date,
-  o.weight_sold,
-  o.sales_return,
-  o.invoice_no,
-  o.invoice_total,
-  o.paid_amount,
-  (o.invoice_total - o.paid_amount) AS baki_amount,
-  CASE
-    WHEN o.invoice_total <= 0 THEN 'NoInvoice'
-    WHEN o.paid_amount >= o.invoice_total THEN 'Paid'
-    WHEN o.paid_amount > 0 THEN 'Partial'
-    ELSE 'Pending'
-  END AS payment_status,
-  o.remarks,
-  COALESCE((
-    SELECT SUM(pr.weight_received * pe.rate) / NULLIF(SUM(pr.weight_received), 0)
-    FROM purchase_receipts pr
-    JOIN purchase_entries pe ON pe.id = pr.purchase_entry_id
-    JOIN products prod ON prod.id = pe.product_id
-    WHERE prod.item = oli.item AND prod.size = oli.size AND prod.grade = oli.grade AND pe.rate > 0
-  ), 0) AS actual_avg_price
-FROM order_line_items oli
-JOIN orders o ON o.id = oli.order_id
-JOIN clients c ON c.id = o.client_id
-`);
-}
+    CREATE TABLE IF NOT EXISTS mx_challans (
+      challan_id     TEXT PRIMARY KEY,
+      challan_no     TEXT NOT NULL UNIQUE,
+      challan_date   TEXT NOT NULL,
+      address_id     INTEGER REFERENCES mx_delivery_addresses(id),
+      party_name     TEXT,
+      assigned_to    INTEGER REFERENCES app_users(id),
+      status         TEXT NOT NULL DEFAULT 'created'
+                     CHECK(status IN ('created','assigned','assembling','dispatched','delivered')),
+      notes          TEXT,
+      allow_partial  INTEGER NOT NULL DEFAULT 0,
+      version        INTEGER NOT NULL DEFAULT 1,
+      deleted_at     TEXT,
+      updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
-function columnExists(db: Db, table: string, name: string) {
-  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
-  return rows.some((r) => r.name === name);
-}
+    CREATE TABLE IF NOT EXISTS mx_challan_requirements (
+      id               INTEGER PRIMARY KEY,
+      challan_id       TEXT NOT NULL REFERENCES mx_challans(challan_id) ON DELETE CASCADE,
+      variant_code     TEXT NOT NULL,
+      required_meters  REAL NOT NULL DEFAULT 0 CHECK(required_meters >= 0),
+      required_pieces  INTEGER NOT NULL DEFAULT 0 CHECK(required_pieces >= 0)
+    );
 
-/** Add columns / tables for existing SQLite files created before PO receipts. */
-function migratePurchaseSchema(db: Db) {
-  if (!columnExists(db, "purchase_entries", "product_id")) {
-    db.exec(`ALTER TABLE purchase_entries ADD COLUMN product_id INTEGER REFERENCES products(id)`);
-  }
-  if (!columnExists(db, "purchase_entries", "debit_note")) {
-    db.exec(`ALTER TABLE purchase_entries ADD COLUMN debit_note TEXT`);
-  }
-  if (!columnExists(db, "purchase_entries", "rec_note")) {
-    db.exec(`ALTER TABLE purchase_entries ADD COLUMN rec_note TEXT`);
-  }
-  if (!columnExists(db, "purchase_entries", "client_po_no")) {
-    db.exec(`ALTER TABLE purchase_entries ADD COLUMN client_po_no TEXT`);
-  }
-  db.exec(`
-CREATE TABLE IF NOT EXISTS purchase_receipts (
-  id INTEGER PRIMARY KEY,
-  purchase_entry_id INTEGER NOT NULL REFERENCES purchase_entries(id) ON DELETE CASCADE,
-  receipt_date TEXT NOT NULL,
-  weight_received REAL NOT NULL CHECK(weight_received > 0),
-  note TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-`);
-  // One-time: move old manual received_weight into receipt lines so totals stay consistent
-  db.exec(`
-INSERT INTO purchase_receipts (purchase_entry_id, receipt_date, weight_received, note)
-SELECT id, purchase_date, received_weight, 'Imported from legacy'
-FROM purchase_entries
-WHERE received_weight > 0
-AND NOT EXISTS (SELECT 1 FROM purchase_receipts r WHERE r.purchase_entry_id = purchase_entries.id);
-`);
-  db.exec(`
-UPDATE purchase_entries SET received_weight = (
-  COALESCE((SELECT SUM(weight_received) FROM purchase_receipts pr WHERE pr.purchase_entry_id = purchase_entries.id), 0) -
-  COALESCE((SELECT SUM(weight) FROM purchase_returns pr WHERE pr.purchase_entry_id = purchase_entries.id), 0)
-) WHERE EXISTS (SELECT 1 FROM purchase_receipts r2 WHERE r2.purchase_entry_id = purchase_entries.id);
-`);
-}
+    CREATE TABLE IF NOT EXISTS mx_challan_scans (
+      scan_id      TEXT PRIMARY KEY,
+      challan_id   TEXT NOT NULL REFERENCES mx_challans(challan_id) ON DELETE CASCADE,
+      scan_type    TEXT NOT NULL CHECK(scan_type IN ('packing','parcel')),
+      scanned_ref  TEXT NOT NULL,
+      scanned_at   TEXT NOT NULL,
+      device_id    TEXT,
+      deleted_at   TEXT,
+      updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(challan_id, scan_type, scanned_ref)
+    );
 
-function migrateDispatchSchema(db: Db) {
-  if (!columnExists(db, "dispatch_entries", "order_line_item_id")) {
-    db.exec(`ALTER TABLE dispatch_entries ADD COLUMN order_line_item_id INTEGER REFERENCES order_line_items(id) ON DELETE CASCADE`);
-    db.exec(`
-      UPDATE dispatch_entries 
-      SET order_line_item_id = (
-        SELECT id FROM order_line_items WHERE order_line_items.order_id = dispatch_entries.order_id LIMIT 1
-      )
-      WHERE order_line_item_id IS NULL;
-    `);
-  }
-  if (!columnExists(db, "dispatch_entries", "dispatch_pcs")) {
-    db.exec(`ALTER TABLE dispatch_entries ADD COLUMN dispatch_pcs INTEGER DEFAULT 0 CHECK(dispatch_pcs >= 0);`);
-  }
-  if (!columnExists(db, "dispatch_entries", "bundle_no")) {
-    db.exec(`ALTER TABLE dispatch_entries ADD COLUMN bundle_no TEXT;`);
-  }
+    CREATE TABLE IF NOT EXISTS mx_sync_conflicts (
+      id              INTEGER PRIMARY KEY,
+      entity          TEXT NOT NULL,
+      client_id       TEXT NOT NULL,
+      device_id       TEXT,
+      local_payload   TEXT NOT NULL,
+      server_payload  TEXT,
+      reason          TEXT NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'open'
+                      CHECK(status IN ('open','resolved','dismissed')),
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      resolved_at     TEXT,
+      resolved_by     INTEGER REFERENCES app_users(id)
+    );
 
-  db.exec(`
-CREATE TABLE IF NOT EXISTS dispatch_tally_bills (
-  id INTEGER PRIMARY KEY,
-  dispatch_entry_id INTEGER NOT NULL REFERENCES dispatch_entries(id) ON DELETE CASCADE,
-  bill_no TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-`);
-
-  if (!columnExists(db, "orders", "remarks")) {
-    db.exec(`ALTER TABLE orders ADD COLUMN remarks TEXT;`);
-  }
-  if (!columnExists(db, "purchase_entries", "remarks")) {
-    db.exec(`ALTER TABLE purchase_entries ADD COLUMN remarks TEXT;`);
-  }
-  if (!columnExists(db, "sales_returns", "remarks")) {
-    db.exec(`ALTER TABLE sales_returns ADD COLUMN remarks TEXT;`);
-  }
-  if (!columnExists(db, "purchase_returns", "remarks")) {
-    db.exec(`ALTER TABLE purchase_returns ADD COLUMN remarks TEXT;`);
-  }
-  if (!columnExists(db, "dispatch_entries", "sales_rate")) {
-    db.exec(`ALTER TABLE dispatch_entries ADD COLUMN sales_rate REAL DEFAULT 0 CHECK(sales_rate >= 0);`);
-  }
-  if (!columnExists(db, "dispatch_entries", "packing_weight")) {
-    db.exec(`ALTER TABLE dispatch_entries ADD COLUMN packing_weight REAL DEFAULT 0 CHECK(packing_weight >= 0);`);
-  }
-}
-
-function migratePurchaseReceiptsInvoice(db: Db) {
-  if (!columnExists(db, "purchase_receipts", "client_invoice_no")) {
-    db.exec(`ALTER TABLE purchase_receipts ADD COLUMN client_invoice_no TEXT`);
-  }
-}
-
-export function seed(db: Db) {
-  const orderCount = db.prepare(`SELECT COUNT(1) as c FROM orders`).get() as { c: number };
-  if (orderCount.c > 0) return;
-
-  const insClient = db.prepare(`INSERT INTO clients(name) VALUES (?)`);
-  const insSupplier = db.prepare(`INSERT INTO suppliers(name) VALUES (?)`);
-  const insProduct = db.prepare(`INSERT INTO products(size,item,grade) VALUES (?,?,?)`);
-  const insOrder = db.prepare(`
-    INSERT INTO orders(
-      wo_no, client_po_no, order_date, client_id, product_id, length_nos, order_kgs,
-      or_no, sales_date, weight_sold, sales_return,
-      avg_cost, bill_rate,
-      invoice_no, invoice_total, paid_amount
-    ) VALUES (
-      @wo_no, @client_po_no, @order_date, @client_id, @product_id, @length_nos, @order_kgs,
-      @or_no, @sales_date, @weight_sold, @sales_return,
-      @avg_cost, @bill_rate,
-      @invoice_no, @invoice_total, @paid_amount
-    )
+    CREATE TABLE IF NOT EXISTS mx_sync_cursors (
+      device_id     TEXT PRIMARY KEY,
+      last_pull_at  TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z',
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
-  
-  const clientA = Number(insClient.run("Shree Metals").lastInsertRowid);
-  const clientB = Number(insClient.run("Kiran Industries").lastInsertRowid);
-  insSupplier.run("Om Suppliers");
-  insSupplier.run("Vishal Traders");
 
-  const prod1 = Number(insProduct.run("8mm", "Copper Rod", "ETP").lastInsertRowid);
-  const prod2 = Number(insProduct.run("50x50", "Copper Section", "DHP").lastInsertRowid);
-
-  const o1 = Number(
-    insOrder.run({
-      wo_no: "WO-1001",
-      client_po_no: "PO-001",
-      order_date: "2026-04-01",
-      client_id: clientA,
-      product_id: prod1,
-      length_nos: "Nos: 25",
-      order_kgs: 1200,
-      or_no: "OR-501",
-      sales_date: "2026-04-02",
-      weight_sold: 900,
-      sales_return: 0,
-      avg_cost: 720,
-      bill_rate: 760,
-      invoice_no: "INV-9001",
-      invoice_total: 684000,
-      paid_amount: 500000,
-    }).lastInsertRowid,
-  );
-
-  const o2 = Number(
-    insOrder.run({
-      wo_no: "WO-1002",
-      client_po_no: "PO-002",
-      order_date: "2026-04-02",
-      client_id: clientB,
-      product_id: prod2,
-      length_nos: "Length: 12ft",
-      order_kgs: 800,
-      or_no: "OR-502",
-      sales_date: "2026-04-02",
-      weight_sold: 800,
-      sales_return: 50,
-      avg_cost: 690,
-      bill_rate: 670,
-      invoice_no: "INV-9002",
-      invoice_total: 536000,
-      paid_amount: 0,
-    }).lastInsertRowid,
-  );
-
-  const insLine = db.prepare(
-    `INSERT INTO order_line_items(order_id, size, item, grade, length_nos, order_kgs, bill_rate, avg_cost) VALUES (?,?,?,?,?,?,?,?)`,
-  );
-  const lineO1 = Number(insLine.run(o1, "8mm", "Copper Rod", "ETP", "Nos: 25", 1200, 760, 720).lastInsertRowid);
-  const lineO2 = Number(insLine.run(o2, "50x50", "Copper Section", "DHP", "Length: 12ft", 800, 670, 690).lastInsertRowid);
-
-  const insDispatch = db.prepare(
-    `INSERT INTO dispatch_entries(order_id, order_line_item_id, dispatch_date, dispatch_weight, transport) VALUES (?,?,?,?,?)`,
-  );
-  insDispatch.run(o1, lineO1, "2026-04-01", 400, "Truck");
-  insDispatch.run(o1, lineO1, "2026-04-02", 500, "Tempo");
-  insDispatch.run(o2, lineO2, "2026-04-02", 750, "Truck");
+  migrateLegacyTxIfEmpty(db);
 }
 
-function migrateJobWorkOut(db: Db) {
-  if (!columnExists(db, "job_work_out_sent", "client_id")) {
-    db.exec(`DROP TABLE IF EXISTS job_work_out_sent`);
-    db.exec(`DROP TABLE IF EXISTS job_work_out_receipt`);
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS job_work_out_sent (
-        id INTEGER PRIMARY KEY,
-        client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
-        challan_date TEXT NOT NULL,
-        description TEXT NOT NULL,
-        qty REAL NOT NULL CHECK(qty >= 0),
-        short_qty REAL DEFAULT 0 CHECK(short_qty >= 0),
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-      CREATE TABLE IF NOT EXISTS job_work_out_receipt (
-        id INTEGER PRIMARY KEY,
-        client_id INTEGER NOT NULL REFERENCES job_work_clients(id) ON DELETE CASCADE,
-        receipt_date TEXT NOT NULL,
-        receipt_qty REAL NOT NULL CHECK(receipt_qty >= 0),
-        process_loss REAL DEFAULT 0 CHECK(process_loss >= 0),
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
+function migrateLegacyTxIfEmpty(db: Db) {
+  const rolls = (db.prepare(`SELECT COUNT(1) AS c FROM mx_rolls`).get() as { c: number }).c;
+  if (rolls > 0) return;
+  if (!tableExists(db, "tx_companies")) return;
+
+  try {
+    const companies = db.prepare(`SELECT * FROM tx_companies`).all() as any[];
+    const insSup = db.prepare(`INSERT OR IGNORE INTO mx_suppliers(id, name, contact) VALUES (?,?,?)`);
+    for (const c of companies) insSup.run(c.id, c.name, c.contact ?? null);
+
+    const mills = db.prepare(`SELECT * FROM tx_mills`).all() as any[];
+    const insJw = db.prepare(`INSERT OR IGNORE INTO mx_job_workers(id, name, contact, job_work_type) VALUES (?,?,?,?)`);
+    for (const m of mills) insJw.run(m.id, m.name, m.contact ?? null, m.job_work_type ?? null);
+
+    const godowns = db.prepare(`SELECT * FROM tx_godowns`).all() as any[];
+    const insG = db.prepare(`INSERT OR IGNORE INTO mx_godowns(id, code, name, location) VALUES (?,?,?,?)`);
+    for (const g of godowns) insG.run(g.id, g.code, g.name, g.location ?? null);
+
+    const addrs = db.prepare(`SELECT * FROM tx_delivery_addresses`).all() as any[];
+    const insA = db.prepare(`INSERT OR IGNORE INTO mx_delivery_addresses(id, party_name, address_line, city, state) VALUES (?,?,?,?,?)`);
+    for (const a of addrs) insA.run(a.id, a.party_name, a.address_line ?? null, a.city ?? null, a.state ?? null);
+
+    const items = db.prepare(`SELECT * FROM tx_items`).all() as any[];
+    const insI = db.prepare(`INSERT OR IGNORE INTO mx_items(id, code, name) VALUES (?,?,?)`);
+    for (const i of items) insI.run(i.id, i.code, i.name);
+
+    const variants = db.prepare(`SELECT * FROM tx_item_variants`).all() as any[];
+    const insV = db.prepare(`INSERT OR IGNORE INTO mx_item_variants(id, item_id, variant_code, variant_name, color) VALUES (?,?,?,?,?)`);
+    for (const v of variants) insV.run(v.id, v.item_id, v.variant_code, v.variant_name, v.color ?? null);
+
+    const stockIns = db.prepare(`SELECT * FROM tx_stock_in`).all() as any[];
+    const insR = db.prepare(`
+      INSERT OR IGNORE INTO mx_rolls(roll_id, short_code, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes)
+      VALUES (?,?,?,?,?,?,'inward',?,?)
     `);
+    for (const s of stockIns) {
+      const rollId = globalThis.crypto.randomUUID();
+      insR.run(rollId, s.lot_no, s.company_id, s.variant_code, s.meter, s.meter, s.received_date, s.notes ?? null);
+    }
+  } catch {
+    /* best-effort */
   }
 }
 
-function migrateJobWorkFields(db: Db) {
-  const tables = ['job_work_inward', 'job_work_outward', 'job_work_out_sent', 'job_work_out_receipt'];
-  for (const table of tables) {
-    if (!columnExists(db, table, "challan_no")) {
-      db.exec(`ALTER TABLE ${table} ADD COLUMN challan_no TEXT;`);
-    }
-    if (!columnExists(db, table, "gross_weight")) {
-      db.exec(`ALTER TABLE ${table} ADD COLUMN gross_weight REAL DEFAULT 0;`);
-    }
-    if (!columnExists(db, table, "tare_weight")) {
-      db.exec(`ALTER TABLE ${table} ADD COLUMN tare_weight REAL DEFAULT 0;`);
-    }
-  }
+function tableExists(db: Db, name: string): boolean {
+  return Boolean(db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(name));
 }
-

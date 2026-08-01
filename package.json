@@ -1,25 +1,24 @@
 {
-  "name": "jigness",
+  "name": "maxwell",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "npm run dev -w @jigness/api & npm run dev -w @jigness/web",
-    "build": "npm run build -w @jigness/api && npm run build -w @jigness/web",
-    "build:prod": "npm run build -w @jigness/api && VITE_API_BASE_URL=/api npm run build -w @jigness/web",
-    "lint": "npm run lint -ws"
+    "dev": "npm run dev -w @maxwell/api & npm run dev -w @maxwell/web",
+    "build": "npm run build -w @maxwell/api && npm run build -w @maxwell/web",
+    "build:prod": "npm run build -w @maxwell/api && VITE_API_BASE_URL=/api npm run build -w @maxwell/web",
+    "lint": "npm run lint -ws",
+    "cap:add": "npm run cap:add -w @maxwell/web",
+    "cap:sync": "npm run cap:sync -w @maxwell/web",
+    "cap:open": "npm run cap:open -w @maxwell/web"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Maxwell Trading — offline-first cloth stock & traceability",
   "private": "true",
   "workspaces": [
     "apps/*",
     "packages/*"
-  ],
-  "dependencies": {
-    "docx": "^9.7.1",
-    "sonic-boom": "^5.0.0"
-  }
+  ]
 }

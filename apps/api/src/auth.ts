@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type AuthRole = "admin" | "user";
+export type AuthRole = "admin" | "user" | "packing" | "godown" | "floor";
+
+const ROLES: AuthRole[] = ["admin", "user", "packing", "godown", "floor"];
 
 export type AuthTokenPayload = {
   exp: number;
@@ -32,7 +34,7 @@ export function parseAuthToken(token: string, secret: string): AuthTokenPayload 
     const data = JSON.parse(Buffer.from(encoded, "base64url").toString()) as Partial<AuthTokenPayload>;
     if (typeof data.exp !== "number" || Date.now() > data.exp) return null;
     if (typeof data.sub !== "string" || !data.sub) return null;
-    const role = data.role === "admin" || data.role === "user" ? data.role : null;
+    const role = ROLES.includes(data.role as AuthRole) ? (data.role as AuthRole) : null;
     if (!role) return null;
     return { exp: data.exp, sub: data.sub, role };
   } catch {

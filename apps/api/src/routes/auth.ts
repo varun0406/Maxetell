@@ -18,7 +18,7 @@ const RegisterFirstBody = z.object({
 const CreateUserBody = z.object({
   username: z.string().trim().min(2).max(64),
   password: z.string().min(6).max(128),
-  role: z.enum(["admin", "user"]).default("user"),
+  role: z.enum(["admin", "user", "packing", "godown", "floor"]).default("user"),
 });
 
 function countUsers(db: Db): number {
