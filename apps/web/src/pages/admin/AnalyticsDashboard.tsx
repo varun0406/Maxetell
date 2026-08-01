@@ -71,15 +71,19 @@ export function AnalyticsPage() {
   const [lineageQ, setLineageQ] = useState("");
   const [lineage, setLineage] = useState<any>(null);
   const [lineageErr, setLineageErr] = useState<string | null>(null);
+  const [byParty, setByParty] = useState<any[]>([]);
+  const [jwPend, setJwPend] = useState<any>(null);
 
   async function load() {
-    const [s, v, sup, g, a, m] = await Promise.all([
+    const [s, v, sup, g, a, m, bp, jw] = await Promise.all([
       api.get("/mx/analytics/summary"),
       api.get("/mx/analytics/stock-by-variant"),
       api.get("/mx/analytics/stock-by-supplier"),
       api.get("/mx/analytics/godown-detail"),
       api.get("/mx/analytics/aging"),
       api.get("/mx/analytics/movement"),
+      api.get("/mx/analytics/by-party"),
+      api.get("/mx/analytics/job-work-pendency"),
     ]);
     setSummary(s.data.data);
     setByVariant(v.data.data ?? []);
@@ -87,6 +91,8 @@ export function AnalyticsPage() {
     setGodownDetail(g.data.data ?? []);
     setAging(a.data.data ?? []);
     setMovement(m.data.data ?? []);
+    setByParty(bp.data.data ?? []);
+    setJwPend(jw.data.data ?? null);
   }
 
   useEffect(() => {
@@ -170,6 +176,8 @@ export function AnalyticsPage() {
         <Tab label="Godown" />
         <Tab label="Aging" />
         <Tab label="Suppliers" />
+        <Tab label="Parties" />
+        <Tab label="Job work" />
         <Tab label="Trace" />
       </Tabs>
 
@@ -471,6 +479,166 @@ export function AnalyticsPage() {
       )}
 
       {tab === 5 && (
+        <Box>
+          <Typography fontWeight={700} mb={1}>
+            Party-wise challan pendency & progress
+          </Typography>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Party</TableCell>
+                <TableCell>GSTIN</TableCell>
+                <TableCell>Phone</TableCell>
+                <TableCell align="right">Open</TableCell>
+                <TableCell align="right">Dispatched</TableCell>
+                <TableCell align="right">Delivered</TableCell>
+                <TableCell align="right">Req m</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {byParty.map((r) => (
+                <TableRow key={`${r.party_id}-${r.party_name}`}>
+                  <TableCell>{r.party_name}</TableCell>
+                  <TableCell sx={{ fontFamily: "monospace", fontSize: 12 }}>{r.gstin || "—"}</TableCell>
+                  <TableCell>{r.phone || "—"}</TableCell>
+                  <TableCell align="right">
+                    <strong>{r.open_challans}</strong>
+                  </TableCell>
+                  <TableCell align="right">{r.dispatched_challans}</TableCell>
+                  <TableCell align="right">{r.delivered_challans}</TableCell>
+                  <TableCell align="right">{Number(r.required_m).toFixed(0)}</TableCell>
+                </TableRow>
+              ))}
+              {!byParty.length && (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ color: "text.secondary" }}>
+                    No party challan data yet
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </Box>
+      )}
+
+      {tab === 6 && (
+        <Box>
+          <Typography fontWeight={700} mb={1}>
+            Job work pendency (material still out)
+          </Typography>
+          <Table size="small" sx={{ mb: 3 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Worker</TableCell>
+                <TableCell>Roll</TableCell>
+                <TableCell>Variant</TableCell>
+                <TableCell>Out</TableCell>
+                <TableCell align="right">Days</TableCell>
+                <TableCell align="right">Outstanding m</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(jwPend?.open ?? []).map((r: any) => (
+                <TableRow key={r.job_work_id}>
+                  <TableCell>{r.worker_name}</TableCell>
+                  <TableCell sx={{ fontFamily: "monospace" }}>{r.roll_short}</TableCell>
+                  <TableCell>{r.variant_code}</TableCell>
+                  <TableCell>{r.outward_date}</TableCell>
+                  <TableCell align="right">{r.days_out}</TableCell>
+                  <TableCell align="right">
+                    <strong>{Number(r.meters_outstanding).toFixed(1)}</strong>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {!(jwPend?.open ?? []).length && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ color: "text.secondary" }}>
+                    No open job work
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+
+          <Typography fontWeight={700} mb={1}>
+            Returned — awaiting receive confirmation
+          </Typography>
+          <Table size="small" sx={{ mb: 3 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Worker</TableCell>
+                <TableCell>Roll</TableCell>
+                <TableCell>Inward</TableCell>
+                <TableCell align="right">Returned m</TableCell>
+                <TableCell align="right">Shortage m</TableCell>
+                <TableCell align="right">Confirm</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(jwPend?.awaiting_confirm ?? []).map((r: any) => (
+                <TableRow key={r.job_work_id}>
+                  <TableCell>{r.worker_name}</TableCell>
+                  <TableCell sx={{ fontFamily: "monospace" }}>{r.roll_short}</TableCell>
+                  <TableCell>{r.inward_date}</TableCell>
+                  <TableCell align="right">{Number(r.meter_returned).toFixed(1)}</TableCell>
+                  <TableCell align="right">{Number(r.shortage_meters).toFixed(1)}</TableCell>
+                  <TableCell align="right">
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={async () => {
+                        await api.post(`/mx/job-work/${r.job_work_id}/confirm-receive`, { received_by: "admin" });
+                        await load();
+                      }}
+                    >
+                      Confirm received
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {!(jwPend?.awaiting_confirm ?? []).length && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ color: "text.secondary" }}>
+                    Nothing awaiting confirmation
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+
+          <Typography fontWeight={700} mb={1}>
+            By job worker
+          </Typography>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Worker</TableCell>
+                <TableCell>Type</TableCell>
+                <TableCell align="right">Open jobs</TableCell>
+                <TableCell align="right">Meters out</TableCell>
+                <TableCell align="right">Unconfirmed</TableCell>
+                <TableCell align="right">Confirmed</TableCell>
+                <TableCell align="right">Shortage m</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(jwPend?.by_worker ?? []).map((r: any) => (
+                <TableRow key={r.worker_name}>
+                  <TableCell>{r.worker_name}</TableCell>
+                  <TableCell>{r.job_work_type || "—"}</TableCell>
+                  <TableCell align="right">{r.open_jobs}</TableCell>
+                  <TableCell align="right">{Number(r.meters_out).toFixed(1)}</TableCell>
+                  <TableCell align="right">{r.unconfirmed_returns}</TableCell>
+                  <TableCell align="right">{r.confirmed_returns}</TableCell>
+                  <TableCell align="right">{Number(r.total_shortage_m).toFixed(1)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
+      )}
+
+      {tab === 7 && (
         <Box>
           <Typography fontWeight={700} mb={1}>
             Lineage trace

@@ -166,6 +166,8 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
         meter_returned: z.number().positive(),
         inward_date: z.string().min(1),
         notes: z.string().optional(),
+        received_by: z.string().optional(),
+        confirm_receive: z.boolean().optional().default(true),
       })
       .parse(req.body);
 
@@ -173,18 +175,58 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
     if (!jw) return reply.code(404).send({ error: "Job work not found" });
     if (jw.processed_state !== "outward") return reply.code(400).send({ error: "Already returned" });
 
+    const shortage = Math.max(0, Number(jw.meter_sent) - body.meter_returned);
+    const confirmedAt = body.confirm_receive ? nowIso() : null;
+
     const txn = db.transaction(() => {
       db.prepare(
         `
-        UPDATE mx_job_work SET meter_returned=?, inward_date=?, processed_state='inward', notes=COALESCE(?, notes), updated_at=?, version=version+1
+        UPDATE mx_job_work SET
+          meter_returned=?, inward_date=?, processed_state='inward',
+          notes=COALESCE(?, notes),
+          shortage_meters=?,
+          received_by=?,
+          received_confirmed_at=?,
+          updated_at=?, version=version+1
         WHERE job_work_id=?
       `,
-      ).run(body.meter_returned, body.inward_date, body.notes ?? null, nowIso(), id);
+      ).run(
+        body.meter_returned,
+        body.inward_date,
+        body.notes ?? null,
+        shortage,
+        body.received_by ?? null,
+        confirmedAt,
+        nowIso(),
+        id,
+      );
       db.prepare(
         `UPDATE mx_rolls SET remaining_meterage = remaining_meterage + ?, status='in_cutting', updated_at=?, version=version+1 WHERE roll_id=?`,
       ).run(body.meter_returned, nowIso(), jw.roll_id);
     });
     txn();
+    return {
+      ok: true,
+      data: {
+        meter_sent: jw.meter_sent,
+        meter_returned: body.meter_returned,
+        shortage_meters: shortage,
+        received_confirmed_at: confirmedAt,
+      },
+    };
+  });
+
+  app.post("/mx/job-work/:id/confirm-receive", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = z.object({ received_by: z.string().optional() }).parse(req.body ?? {});
+    const jw = db.prepare(`SELECT * FROM mx_job_work WHERE job_work_id=? AND deleted_at IS NULL`).get(id) as any;
+    if (!jw) return reply.code(404).send({ error: "Job work not found" });
+    if (jw.processed_state === "outward") {
+      return reply.code(400).send({ error: "Record return meters first via /return" });
+    }
+    db.prepare(
+      `UPDATE mx_job_work SET received_confirmed_at=?, received_by=COALESCE(?, received_by), updated_at=?, version=version+1 WHERE job_work_id=?`,
+    ).run(nowIso(), body.received_by ?? null, nowIso(), id);
     return { ok: true };
   });
 }

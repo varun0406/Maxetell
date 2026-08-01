@@ -4,7 +4,96 @@ import { seedMaxwellDemo } from "./seed.js";
 export function migrate(db: Db) {
   migrateAppUsers(db);
   migrateMaxwellDomain(db);
+  migratePartiesAgentsReporting(db);
   seedMaxwellDemo(db);
+}
+
+function tableExists(db: Db, name: string): boolean {
+  return Boolean(db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(name));
+}
+
+function columnExists(db: Db, table: string, column: string): boolean {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  return cols.some((c) => c.name === column);
+}
+
+function ensureColumn(db: Db, table: string, column: string, ddl: string) {
+  if (!tableExists(db, table)) return;
+  if (columnExists(db, table, column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+}
+
+/** Party onboarding, agents, dual-address challans, job-work receive confirmation */
+function migratePartiesAgentsReporting(db: Db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mx_parties (
+      id            INTEGER PRIMARY KEY,
+      name          TEXT NOT NULL UNIQUE,
+      address_line  TEXT,
+      city          TEXT,
+      state         TEXT,
+      gstin         TEXT,
+      phone         TEXT,
+      notes         TEXT,
+      deleted_at    TEXT,
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS mx_agents (
+      id          INTEGER PRIMARY KEY,
+      name        TEXT NOT NULL UNIQUE,
+      phone       TEXT,
+      notes       TEXT,
+      deleted_at  TEXT,
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  ensureColumn(db, "mx_delivery_addresses", "party_id", "INTEGER REFERENCES mx_parties(id)");
+  ensureColumn(db, "mx_delivery_addresses", "phone", "TEXT");
+  ensureColumn(db, "mx_delivery_addresses", "label", "TEXT");
+
+  ensureColumn(db, "mx_challans", "party_id", "INTEGER REFERENCES mx_parties(id)");
+  ensureColumn(db, "mx_challans", "agent_id", "INTEGER REFERENCES mx_agents(id)");
+  ensureColumn(db, "mx_challans", "agent_name", "TEXT");
+
+  ensureColumn(db, "mx_job_work", "received_confirmed_at", "TEXT");
+  ensureColumn(db, "mx_job_work", "received_by", "TEXT");
+  ensureColumn(db, "mx_job_work", "shortage_meters", "REAL DEFAULT 0");
+
+  // Backfill parties from legacy delivery addresses (name-only)
+  const orphans = db
+    .prepare(
+      `
+    SELECT DISTINCT party_name FROM mx_delivery_addresses
+    WHERE deleted_at IS NULL AND party_name IS NOT NULL AND TRIM(party_name) != ''
+      AND (party_id IS NULL)
+  `,
+    )
+    .all() as { party_name: string }[];
+  const findParty = db.prepare(`SELECT id FROM mx_parties WHERE LOWER(name)=LOWER(?) AND deleted_at IS NULL`);
+  const insParty = db.prepare(
+    `INSERT INTO mx_parties(name, address_line, city, state, updated_at) VALUES (?,?,?,?,datetime('now'))`,
+  );
+  const linkAddr = db.prepare(`UPDATE mx_delivery_addresses SET party_id=? WHERE party_name=? AND party_id IS NULL`);
+  for (const o of orphans) {
+    let row = findParty.get(o.party_name) as { id: number } | undefined;
+    if (!row) {
+      const sample = db
+        .prepare(
+          `SELECT address_line, city, state FROM mx_delivery_addresses WHERE party_name=? AND deleted_at IS NULL LIMIT 1`,
+        )
+        .get(o.party_name) as { address_line?: string; city?: string; state?: string } | undefined;
+      const id = Number(
+        insParty.run(o.party_name, sample?.address_line ?? null, sample?.city ?? null, sample?.state ?? null)
+          .lastInsertRowid,
+      );
+      row = { id };
+    }
+    linkAddr.run(row.id, o.party_name);
+  }
 }
 
 function migrateAppUsers(db: Db) {
@@ -265,8 +354,4 @@ function migrateLegacyTxIfEmpty(db: Db) {
   } catch {
     /* best-effort */
   }
-}
-
-function tableExists(db: Db, name: string): boolean {
-  return Boolean(db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(name));
 }

@@ -37,21 +37,42 @@ export function MastersPage() {
   const [workers, setWorkers] = useState<any[]>([]);
   const [godowns, setGodowns] = useState<any[]>([]);
   const [addresses, setAddresses] = useState<any[]>([]);
+  const [parties, setParties] = useState<any[]>([]);
+  const [agents, setAgents] = useState<any[]>([]);
 
   const [itemForm, setItemForm] = useState({ code: "", name: "", quality: "" });
   const [varForm, setVarForm] = useState({ item_id: 0, variant_code: "", variant_name: "", color: "" });
   const [supForm, setSupForm] = useState({ name: "", contact: "" });
   const [jwForm, setJwForm] = useState({ name: "", contact: "", job_work_type: "" });
   const [gForm, setGForm] = useState({ code: "", name: "", location: "" });
-  const [aForm, setAForm] = useState({ party_name: "", address_line: "", city: "", state: "" });
+  const [partyForm, setPartyForm] = useState({
+    name: "",
+    address_line: "",
+    city: "",
+    state: "",
+    gstin: "",
+    phone: "",
+  });
+  const [agentForm, setAgentForm] = useState({ name: "", phone: "" });
+  const [aForm, setAForm] = useState({
+    party_id: 0,
+    party_name: "",
+    address_line: "",
+    city: "",
+    state: "",
+    phone: "",
+    label: "Deliver to",
+  });
 
   async function load() {
-    const [i, s, w, g, a] = await Promise.all([
+    const [i, s, w, g, a, p, ag] = await Promise.all([
       api.get("/mx/items"),
       api.get("/mx/suppliers"),
       api.get("/mx/job-workers"),
       api.get("/mx/godowns"),
       api.get("/mx/addresses"),
+      api.get("/mx/parties"),
+      api.get("/mx/agents"),
     ]);
     setItems(i.data.data.items ?? []);
     setVariants(i.data.data.variants ?? []);
@@ -59,6 +80,8 @@ export function MastersPage() {
     setWorkers(w.data.data ?? []);
     setGodowns(g.data.data ?? []);
     setAddresses(a.data.data ?? []);
+    setParties(p.data.data ?? []);
+    setAgents(ag.data.data ?? []);
   }
 
   useEffect(() => {
@@ -72,10 +95,12 @@ export function MastersPage() {
       </Typography>
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable">
         <Tab label="Item Charter" />
+        <Tab label="Parties" />
+        <Tab label="Ship-to" />
+        <Tab label="Agents" />
         <Tab label="Suppliers" />
         <Tab label="Job Workers" />
         <Tab label="Godowns" />
-        <Tab label="Addresses" />
       </Tabs>
 
       <TabPanel value={tab} index={0}>
@@ -137,6 +162,123 @@ export function MastersPage() {
       </TabPanel>
 
       <TabPanel value={tab} index={1}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Party onboarding — billing name, address, GSTIN, phone
+        </Typography>
+        <Stack direction="row" spacing={1} mb={2} flexWrap="wrap" useFlexGap>
+          <TextField size="small" label="Party name" value={partyForm.name} onChange={(e) => setPartyForm({ ...partyForm, name: e.target.value })} />
+          <TextField size="small" label="Address" value={partyForm.address_line} onChange={(e) => setPartyForm({ ...partyForm, address_line: e.target.value })} sx={{ minWidth: 200 }} />
+          <TextField size="small" label="City" value={partyForm.city} onChange={(e) => setPartyForm({ ...partyForm, city: e.target.value })} />
+          <TextField size="small" label="State" value={partyForm.state} onChange={(e) => setPartyForm({ ...partyForm, state: e.target.value })} />
+          <TextField size="small" label="GSTIN" value={partyForm.gstin} onChange={(e) => setPartyForm({ ...partyForm, gstin: e.target.value })} />
+          <TextField size="small" label="Phone" value={partyForm.phone} onChange={(e) => setPartyForm({ ...partyForm, phone: e.target.value })} />
+          <Button
+            variant="contained"
+            onClick={async () => {
+              await api.post("/mx/parties", partyForm);
+              setPartyForm({ name: "", address_line: "", city: "", state: "", gstin: "", phone: "" });
+              await load();
+            }}
+          >
+            Onboard party
+          </Button>
+        </Stack>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Address</TableCell>
+              <TableCell>GSTIN</TableCell>
+              <TableCell>Phone</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {parties.map((p) => (
+              <TableRow key={p.id}>
+                <TableCell>{p.name}</TableCell>
+                <TableCell>
+                  {[p.address_line, p.city, p.state].filter(Boolean).join(", ")}
+                </TableCell>
+                <TableCell sx={{ fontFamily: "monospace" }}>{p.gstin || "—"}</TableCell>
+                <TableCell>{p.phone || "—"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TabPanel>
+
+      <TabPanel value={tab} index={2}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Ship-to / deliver-to addresses (linked to a party when possible)
+        </Typography>
+        <Stack direction="row" spacing={1} mb={2} flexWrap="wrap" useFlexGap>
+          <TextField
+            select
+            size="small"
+            label="Party"
+            value={aForm.party_id}
+            onChange={(e) => {
+              const id = Number(e.target.value);
+              const p = parties.find((x) => x.id === id);
+              setAForm({
+                ...aForm,
+                party_id: id,
+                party_name: p?.name ?? aForm.party_name,
+              });
+            }}
+            sx={{ minWidth: 160 }}
+          >
+            <MenuItem value={0}>—</MenuItem>
+            {parties.map((p) => (
+              <MenuItem key={p.id} value={p.id}>
+                {p.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField size="small" label="Ship label / name" value={aForm.party_name} onChange={(e) => setAForm({ ...aForm, party_name: e.target.value })} />
+          <TextField size="small" label="Deliver-to address" value={aForm.address_line} onChange={(e) => setAForm({ ...aForm, address_line: e.target.value })} sx={{ minWidth: 200 }} />
+          <TextField size="small" label="City" value={aForm.city} onChange={(e) => setAForm({ ...aForm, city: e.target.value })} />
+          <TextField size="small" label="Phone" value={aForm.phone} onChange={(e) => setAForm({ ...aForm, phone: e.target.value })} />
+          <Button
+            variant="contained"
+            onClick={async () => {
+              await api.post("/mx/addresses", {
+                ...aForm,
+                party_id: aForm.party_id || undefined,
+              });
+              setAForm({ party_id: 0, party_name: "", address_line: "", city: "", state: "", phone: "", label: "Deliver to" });
+              await load();
+            }}
+          >
+            Add ship-to
+          </Button>
+        </Stack>
+        {addresses.map((a) => (
+          <Chip key={a.id} label={`${a.party_name} · ${a.city ?? ""}`} sx={{ m: 0.5 }} />
+        ))}
+      </TabPanel>
+
+      <TabPanel value={tab} index={3}>
+        <Stack direction="row" spacing={1} mb={2}>
+          <TextField size="small" label="Agent name" value={agentForm.name} onChange={(e) => setAgentForm({ ...agentForm, name: e.target.value })} />
+          <TextField size="small" label="Phone" value={agentForm.phone} onChange={(e) => setAgentForm({ ...agentForm, phone: e.target.value })} />
+          <Button
+            variant="contained"
+            onClick={async () => {
+              await api.post("/mx/agents", agentForm);
+              setAgentForm({ name: "", phone: "" });
+              await load();
+            }}
+          >
+            Add agent
+          </Button>
+        </Stack>
+        {agents.map((a) => (
+          <Chip key={a.id} label={`${a.name}${a.phone ? ` · ${a.phone}` : ""}`} sx={{ m: 0.5 }} />
+        ))}
+      </TabPanel>
+
+      <TabPanel value={tab} index={4}>
         <Stack direction="row" spacing={1} mb={2}>
           <TextField size="small" label="Name" value={supForm.name} onChange={(e) => setSupForm({ ...supForm, name: e.target.value })} />
           <TextField size="small" label="Contact" value={supForm.contact} onChange={(e) => setSupForm({ ...supForm, contact: e.target.value })} />
@@ -156,7 +298,7 @@ export function MastersPage() {
         ))}
       </TabPanel>
 
-      <TabPanel value={tab} index={2}>
+      <TabPanel value={tab} index={5}>
         <Stack direction="row" spacing={1} mb={2}>
           <TextField size="small" label="Name" value={jwForm.name} onChange={(e) => setJwForm({ ...jwForm, name: e.target.value })} />
           <TextField size="small" label="Type" value={jwForm.job_work_type} onChange={(e) => setJwForm({ ...jwForm, job_work_type: e.target.value })} />
@@ -176,7 +318,7 @@ export function MastersPage() {
         ))}
       </TabPanel>
 
-      <TabPanel value={tab} index={3}>
+      <TabPanel value={tab} index={6}>
         <Stack direction="row" spacing={1} mb={2}>
           <TextField size="small" label="Code" value={gForm.code} onChange={(e) => setGForm({ ...gForm, code: e.target.value })} />
           <TextField size="small" label="Name" value={gForm.name} onChange={(e) => setGForm({ ...gForm, name: e.target.value })} />
@@ -196,27 +338,79 @@ export function MastersPage() {
           <Chip key={g.id} label={`${g.code} ${g.name}`} sx={{ m: 0.5 }} />
         ))}
       </TabPanel>
+    </Box>
+  );
+}
 
-      <TabPanel value={tab} index={4}>
-        <Stack direction="row" spacing={1} mb={2} flexWrap="wrap">
-          <TextField size="small" label="Party" value={aForm.party_name} onChange={(e) => setAForm({ ...aForm, party_name: e.target.value })} />
-          <TextField size="small" label="Address" value={aForm.address_line} onChange={(e) => setAForm({ ...aForm, address_line: e.target.value })} />
-          <TextField size="small" label="City" value={aForm.city} onChange={(e) => setAForm({ ...aForm, city: e.target.value })} />
-          <Button
-            variant="contained"
-            onClick={async () => {
-              await api.post("/mx/addresses", aForm);
-              setAForm({ party_name: "", address_line: "", city: "", state: "" });
-              await load();
-            }}
-          >
-            Add
-          </Button>
-        </Stack>
-        {addresses.map((a) => (
-          <Chip key={a.id} label={`${a.party_name} ${a.city ?? ""}`} sx={{ m: 0.5 }} />
-        ))}
-      </TabPanel>
+function JobWorkReceivePanel({ onDone }: { onDone: () => Promise<void> }) {
+  const [openJobs, setOpenJobs] = useState<any[]>([]);
+  const [meters, setMeters] = useState<Record<string, number>>({});
+
+  async function loadJobs() {
+    const r = await api.get("/mx/job-work");
+    setOpenJobs((r.data.data ?? []).filter((j: any) => j.processed_state === "outward"));
+  }
+
+  useEffect(() => {
+    void loadJobs();
+  }, []);
+
+  return (
+    <Box mb={2}>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Worker</TableCell>
+            <TableCell>Roll</TableCell>
+            <TableCell align="right">Sent m</TableCell>
+            <TableCell align="right">Return m</TableCell>
+            <TableCell align="right">Action</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {openJobs.map((j) => (
+            <TableRow key={j.job_work_id}>
+              <TableCell>{j.worker_name}</TableCell>
+              <TableCell sx={{ fontFamily: "monospace" }}>{j.roll_short}</TableCell>
+              <TableCell align="right">{j.meter_sent}</TableCell>
+              <TableCell align="right">
+                <TextField
+                  size="small"
+                  type="number"
+                  sx={{ width: 100 }}
+                  value={meters[j.job_work_id] ?? j.meter_sent}
+                  onChange={(e) => setMeters({ ...meters, [j.job_work_id]: Number(e.target.value) })}
+                />
+              </TableCell>
+              <TableCell align="right">
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={async () => {
+                    await api.post(`/mx/job-work/${j.job_work_id}/return`, {
+                      meter_returned: meters[j.job_work_id] ?? j.meter_sent,
+                      inward_date: new Date().toISOString().slice(0, 10),
+                      received_by: "warehouse",
+                      confirm_receive: true,
+                    });
+                    await loadJobs();
+                    await onDone();
+                  }}
+                >
+                  Receive & confirm
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+          {!openJobs.length && (
+            <TableRow>
+              <TableCell colSpan={5} align="center" sx={{ color: "text.secondary" }}>
+                No open job-work outward
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </Box>
   );
 }
@@ -302,6 +496,11 @@ export function RollsPage() {
           Send out
         </Button>
       </Stack>
+
+      <Typography fontWeight={700} mb={1}>
+        Confirm material received from job work
+      </Typography>
+      <JobWorkReceivePanel onDone={load} />
 
       <Table size="small">
         <TableHead>

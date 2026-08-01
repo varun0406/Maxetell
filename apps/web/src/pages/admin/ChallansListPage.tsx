@@ -76,6 +76,7 @@ export function ChallansListPage() {
               <TableCell>Challan</TableCell>
               <TableCell>Date</TableCell>
               <TableCell>Party</TableCell>
+              <TableCell>Agent</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="right">Scans</TableCell>
               <TableCell align="right">PDF</TableCell>
@@ -86,7 +87,8 @@ export function ChallansListPage() {
               <TableRow key={c.challan_id} hover>
                 <TableCell sx={{ fontFamily: "monospace", fontWeight: 700 }}>{c.challan_no}</TableCell>
                 <TableCell>{c.challan_date}</TableCell>
-                <TableCell>{c.party_name || c.addr_party || "—"}</TableCell>
+                <TableCell>{c.party_master_name || c.party_name || c.addr_party || "—"}</TableCell>
+                <TableCell>{c.agent_display || "—"}</TableCell>
                 <TableCell>
                   <Chip size="small" label={c.status} color={c.status === "dispatched" ? "success" : c.status === "assembling" ? "warning" : "default"} />
                 </TableCell>
@@ -100,7 +102,7 @@ export function ChallansListPage() {
             ))}
             {!rows.length && (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ color: "text.secondary" }}>
+                <TableCell colSpan={7} align="center" sx={{ color: "text.secondary" }}>
                   No challans
                 </TableCell>
               </TableRow>

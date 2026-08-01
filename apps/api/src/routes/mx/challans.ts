@@ -96,10 +96,15 @@ export async function registerMxChallanRoutes(app: FastifyInstance, opts: { db: 
   app.get("/mx/challans", async (req) => {
     const { status } = req.query as { status?: string };
     let sql = `
-      SELECT c.*, a.party_name AS addr_party, a.city,
+      SELECT c.*,
+        a.party_name AS addr_party, a.city AS ship_city,
+        p.name AS party_master_name, p.gstin AS party_gstin,
+        COALESCE(ag.name, c.agent_name) AS agent_display,
         (SELECT COUNT(1) FROM mx_challan_scans s WHERE s.challan_id=c.challan_id AND s.deleted_at IS NULL) AS scan_count
       FROM mx_challans c
       LEFT JOIN mx_delivery_addresses a ON a.id = c.address_id
+      LEFT JOIN mx_parties p ON p.id = c.party_id
+      LEFT JOIN mx_agents ag ON ag.id = c.agent_id
       WHERE c.deleted_at IS NULL
     `;
     const params: any[] = [];
@@ -116,9 +121,16 @@ export async function registerMxChallanRoutes(app: FastifyInstance, opts: { db: 
     const c = db
       .prepare(
         `
-      SELECT c.*, a.party_name AS addr_party, a.address_line, a.city, a.state
+      SELECT c.*,
+        a.party_name AS ship_label, a.address_line AS ship_address_line, a.city AS ship_city, a.state AS ship_state, a.phone AS ship_phone,
+        a.party_name AS addr_party, a.address_line, a.city, a.state,
+        p.name AS party_name_master, p.address_line AS party_address_line, p.city AS party_city, p.state AS party_state,
+        p.gstin AS party_gstin, p.phone AS party_phone,
+        COALESCE(ag.name, c.agent_name) AS agent_display, ag.phone AS agent_phone
       FROM mx_challans c
       LEFT JOIN mx_delivery_addresses a ON a.id = c.address_id
+      LEFT JOIN mx_parties p ON p.id = c.party_id
+      LEFT JOIN mx_agents ag ON ag.id = c.agent_id
       WHERE (c.challan_id=? OR c.challan_no=?) AND c.deleted_at IS NULL
     `,
       )
@@ -154,7 +166,10 @@ export async function registerMxChallanRoutes(app: FastifyInstance, opts: { db: 
         challan_id: z.string().uuid().optional(),
         challan_date: z.string().min(1),
         address_id: z.number().int().positive().optional(),
+        party_id: z.number().int().positive().optional(),
         party_name: z.string().optional(),
+        agent_id: z.number().int().positive().optional(),
+        agent_name: z.string().optional(),
         assigned_to: z.number().int().positive().optional(),
         notes: z.string().optional(),
         allow_partial: z.boolean().optional(),
@@ -173,18 +188,35 @@ export async function registerMxChallanRoutes(app: FastifyInstance, opts: { db: 
     const challan_id = body.challan_id ?? crypto.randomUUID();
     const challan_no = shortCode("DC", challan_id);
 
+    let partyName = body.party_name ?? null;
+    if (body.party_id && !partyName) {
+      const p = db.prepare(`SELECT name FROM mx_parties WHERE id=?`).get(body.party_id) as { name: string } | undefined;
+      partyName = p?.name ?? null;
+    }
+    let agentName = body.agent_name ?? null;
+    if (body.agent_id && !agentName) {
+      const a = db.prepare(`SELECT name FROM mx_agents WHERE id=?`).get(body.agent_id) as { name: string } | undefined;
+      agentName = a?.name ?? null;
+    }
+
     const txn = db.transaction(() => {
       db.prepare(
         `
-        INSERT INTO mx_challans(challan_id, challan_no, challan_date, address_id, party_name, assigned_to, notes, allow_partial, status, updated_at)
-        VALUES (?,?,?,?,?,?,?,?,'created',?)
+        INSERT INTO mx_challans(
+          challan_id, challan_no, challan_date, address_id, party_id, party_name,
+          agent_id, agent_name, assigned_to, notes, allow_partial, status, updated_at
+        )
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,'created',?)
       `,
       ).run(
         challan_id,
         challan_no,
         body.challan_date,
         body.address_id ?? null,
-        body.party_name ?? null,
+        body.party_id ?? null,
+        partyName,
+        body.agent_id ?? null,
+        agentName,
         body.assigned_to ?? null,
         body.notes ?? null,
         body.allow_partial ? 1 : 0,

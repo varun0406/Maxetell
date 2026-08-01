@@ -4,9 +4,10 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/maxwell
+WorkingDirectory=/opt/maxwell/apps/api
 EnvironmentFile=/etc/maxwell/api.env
-ExecStart=/usr/bin/npm run start -w @maxwell/api
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node dist/index.js
 Restart=always
 RestartSec=3
 

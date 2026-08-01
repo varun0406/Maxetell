@@ -334,4 +334,89 @@ export async function registerMxAnalyticsRoutes(app: FastifyInstance, opts: { db
 
     return reply.code(404).send({ error: "No lineage found for ref" });
   });
+
+  /** Party-wise challan pendency + dispatch progress */
+  app.get("/mx/analytics/by-party", async () => {
+    const rows = db
+      .prepare(
+        `
+      SELECT
+        COALESCE(p.id, 0) AS party_id,
+        COALESCE(p.name, c.party_name, a.party_name, 'Unknown') AS party_name,
+        p.gstin, p.phone,
+        COUNT(1) AS challan_count,
+        SUM(CASE WHEN c.status IN ('created','assigned','assembling') THEN 1 ELSE 0 END) AS open_challans,
+        SUM(CASE WHEN c.status='dispatched' THEN 1 ELSE 0 END) AS dispatched_challans,
+        SUM(CASE WHEN c.status='delivered' THEN 1 ELSE 0 END) AS delivered_challans,
+        COALESCE(SUM(req.req_m),0) AS required_m,
+        COALESCE(SUM(req.req_pcs),0) AS required_pcs
+      FROM mx_challans c
+      LEFT JOIN mx_parties p ON p.id = c.party_id
+      LEFT JOIN mx_delivery_addresses a ON a.id = c.address_id
+      LEFT JOIN (
+        SELECT challan_id, SUM(required_meters) AS req_m, SUM(required_pieces) AS req_pcs
+        FROM mx_challan_requirements GROUP BY challan_id
+      ) req ON req.challan_id = c.challan_id
+      WHERE c.deleted_at IS NULL
+      GROUP BY COALESCE(p.id, 0), COALESCE(p.name, c.party_name, a.party_name, 'Unknown'), p.gstin, p.phone
+      ORDER BY open_challans DESC, challan_count DESC
+    `,
+      )
+      .all();
+    return { data: rows };
+  });
+
+  /** Job-work pendency / progress / receive confirmation */
+  app.get("/mx/analytics/job-work-pendency", async () => {
+    const open = db
+      .prepare(
+        `
+      SELECT j.*, w.name AS worker_name, w.job_work_type, r.short_code AS roll_short, r.variant_code,
+             CAST((julianday('now') - julianday(j.outward_date)) AS INTEGER) AS days_out,
+             (j.meter_sent - COALESCE(j.meter_returned,0)) AS meters_outstanding
+      FROM mx_job_work j
+      JOIN mx_job_workers w ON w.id = j.job_worker_id
+      JOIN mx_rolls r ON r.roll_id = j.roll_id
+      WHERE j.deleted_at IS NULL AND j.processed_state = 'outward'
+      ORDER BY days_out DESC
+    `,
+      )
+      .all();
+
+    const awaitingConfirm = db
+      .prepare(
+        `
+      SELECT j.*, w.name AS worker_name, r.short_code AS roll_short, r.variant_code,
+             COALESCE(j.shortage_meters, 0) AS shortage_meters
+      FROM mx_job_work j
+      JOIN mx_job_workers w ON w.id = j.job_worker_id
+      JOIN mx_rolls r ON r.roll_id = j.roll_id
+      WHERE j.deleted_at IS NULL
+        AND j.processed_state IN ('inward','closed')
+        AND j.received_confirmed_at IS NULL
+      ORDER BY j.inward_date DESC
+    `,
+      )
+      .all();
+
+    const byWorker = db
+      .prepare(
+        `
+      SELECT w.name AS worker_name, w.job_work_type,
+        SUM(CASE WHEN j.processed_state='outward' THEN 1 ELSE 0 END) AS open_jobs,
+        SUM(CASE WHEN j.processed_state='outward' THEN j.meter_sent - COALESCE(j.meter_returned,0) ELSE 0 END) AS meters_out,
+        SUM(CASE WHEN j.processed_state IN ('inward','closed') AND j.received_confirmed_at IS NULL THEN 1 ELSE 0 END) AS unconfirmed_returns,
+        SUM(CASE WHEN j.received_confirmed_at IS NOT NULL THEN 1 ELSE 0 END) AS confirmed_returns,
+        SUM(COALESCE(j.shortage_meters,0)) AS total_shortage_m
+      FROM mx_job_workers w
+      LEFT JOIN mx_job_work j ON j.job_worker_id = w.id AND j.deleted_at IS NULL
+      WHERE w.deleted_at IS NULL
+      GROUP BY w.id
+      ORDER BY meters_out DESC
+    `,
+      )
+      .all();
+
+    return { data: { open, awaiting_confirm: awaitingConfirm, by_worker: byWorker } };
+  });
 }

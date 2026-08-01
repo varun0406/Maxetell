@@ -43,11 +43,44 @@ export function seedMaxwellDemo(db: Db, opts?: { force?: boolean }) {
     const g2 = Number(insG.run("G2", "Annex Warehouse", "First Floor Rack A-D").lastInsertRowid);
     const g3 = Number(insG.run("G3", "Dispatch Bay", "Loading Dock").lastInsertRowid);
 
-    const insA = db.prepare(`INSERT INTO mx_delivery_addresses(party_name, address_line, city, state) VALUES (?,?,?,?)`);
-    const a1 = Number(insA.run("Fashion Hub Retail", "12 Ring Road", "Surat", "Gujarat").lastInsertRowid);
-    const a2 = Number(insA.run("Metro Garments", "45 Industrial Estate", "Ahmedabad", "Gujarat").lastInsertRowid);
-    const a3 = Number(insA.run("Style Mart", "88 MG Road", "Mumbai", "Maharashtra").lastInsertRowid);
-    const a4 = Number(insA.run("Cloth Corner", "3 Textile Market", "Surat", "Gujarat").lastInsertRowid);
+    const insParty = db.prepare(
+      `INSERT INTO mx_parties(name, address_line, city, state, gstin, phone) VALUES (?,?,?,?,?,?)`,
+    );
+    const p1 = Number(
+      insParty.run("Fashion Hub Retail", "12 Ring Road, Textile Market", "Surat", "Gujarat", "24AABCF1234A1Z5", "98765-44001")
+        .lastInsertRowid,
+    );
+    const p2 = Number(
+      insParty.run("Metro Garments", "45 Industrial Estate", "Ahmedabad", "Gujarat", "24AABCM5678B1Z2", "98765-44002")
+        .lastInsertRowid,
+    );
+    const p3 = Number(
+      insParty.run("Style Mart", "88 MG Road", "Mumbai", "Maharashtra", "27AABCS9012C1Z8", "98765-44003").lastInsertRowid,
+    );
+    const p4 = Number(
+      insParty.run("Cloth Corner", "3 Textile Market", "Surat", "Gujarat", "24AABCC3456D1Z1", "98765-44004").lastInsertRowid,
+    );
+
+    const insAgent = db.prepare(`INSERT INTO mx_agents(name, phone) VALUES (?,?)`);
+    const ag1 = Number(insAgent.run("Ramesh Patel", "98111-10001").lastInsertRowid);
+    const ag2 = Number(insAgent.run("Suresh Shah", "98111-10002").lastInsertRowid);
+
+    const insA = db.prepare(
+      `INSERT INTO mx_delivery_addresses(party_id, party_name, address_line, city, state, phone, label) VALUES (?,?,?,?,?,?,?)`,
+    );
+    const a1 = Number(
+      insA.run(p1, "Fashion Hub Retail", "Dispatch Gate B, Ring Road", "Surat", "Gujarat", "98765-44001", "Deliver to").lastInsertRowid,
+    );
+    const a2 = Number(
+      insA.run(p2, "Metro Garments", "Warehouse 2, Industrial Estate", "Ahmedabad", "Gujarat", "98765-44002", "Deliver to")
+        .lastInsertRowid,
+    );
+    const a3 = Number(
+      insA.run(p3, "Style Mart", "Loading Bay, MG Road", "Mumbai", "Maharashtra", "98765-44003", "Deliver to").lastInsertRowid,
+    );
+    const a4 = Number(
+      insA.run(p4, "Cloth Corner", "Shop front, Textile Market", "Surat", "Gujarat", "98765-44004", "Deliver to").lastInsertRowid,
+    );
 
     const items = [
       { code: "1", name: "Carens", quality: "Premium Cotton" },
@@ -193,10 +226,13 @@ export function seedMaxwellDemo(db: Db, opts?: { force?: boolean }) {
     const parcel1 = makeParcel([c1, c2, c3], 5);
     const parcel2 = makeParcel([c4, c5, c6], 3);
 
-    // Challans
+    // Challans — party (billing) + ship-to address + agent
     const insCh = db.prepare(`
-      INSERT INTO mx_challans(challan_id, challan_no, challan_date, address_id, party_name, status, notes, allow_partial, updated_at)
-      VALUES (?,?,?,?,?,?,?,0,datetime('now'))
+      INSERT INTO mx_challans(
+        challan_id, challan_no, challan_date, address_id, party_id, party_name,
+        agent_id, agent_name, status, notes, allow_partial, updated_at
+      )
+      VALUES (?,?,?,?,?,?,?,?,?,?,0,datetime('now'))
     `);
     const insReq = db.prepare(`
       INSERT INTO mx_challan_requirements(challan_id, variant_code, required_meters, required_pieces) VALUES (?,?,?,?)
@@ -207,17 +243,17 @@ export function seedMaxwellDemo(db: Db, opts?: { force?: boolean }) {
     `);
 
     const ch1 = uuid();
-    insCh.run(ch1, short("DC", ch1), daysAgo(1), a1, null, "assembling", "Demo open challan");
+    insCh.run(ch1, short("DC", ch1), daysAgo(1), a1, p1, "Fashion Hub Retail", ag1, "Ramesh Patel", "assembling", "Demo open challan");
     insReq.run(ch1, "1-a", 50, 2);
     insReq.run(ch1, "2-a", 30, 1);
 
     const ch2 = uuid();
-    insCh.run(ch2, short("DC", ch2), daysAgo(2), a2, null, "created", "Awaiting floor");
+    insCh.run(ch2, short("DC", ch2), daysAgo(2), a2, p2, "Metro Garments", ag2, "Suresh Shah", "created", "Awaiting floor");
     insReq.run(ch2, "3-a", 40, 2);
     insReq.run(ch2, "4-a", 35, 1);
 
     const ch3 = uuid();
-    insCh.run(ch3, short("DC", ch3), daysAgo(10), a3, null, "dispatched", "Completed demo");
+    insCh.run(ch3, short("DC", ch3), daysAgo(10), a3, p3, "Style Mart", ag1, "Ramesh Patel", "dispatched", "Completed demo");
     insReq.run(ch3, "1-c", 70, 2);
     // use dispatched packings short codes - find them
     const dispatched = packingIds.filter((p) => p.status === "dispatched");
@@ -225,13 +261,12 @@ export function seedMaxwellDemo(db: Db, opts?: { force?: boolean }) {
     if (dispatched[1]) insScan.run(uuid(), ch3, "packing", dispatched[1].id, daysAgo(9));
 
     const ch4 = uuid();
-    insCh.run(ch4, short("DC", ch4), daysAgo(0), a4, null, "assigned", "Peak season direct");
+    insCh.run(ch4, short("DC", ch4), daysAgo(0), a4, p4, "Cloth Corner", ag2, "Suresh Shah", "assigned", "Peak season direct");
     insReq.run(ch4, "5-a", 30, 1);
     insReq.run(ch4, "5-b", 25, 1);
     insScan.run(uuid(), ch4, "parcel", parcel1.id, daysAgo(0));
 
     void parcel2;
-    void a1;
   });
 
   txn();
@@ -250,6 +285,8 @@ export function clearMaxwellDemo(db: Db) {
     DELETE FROM mx_item_variants;
     DELETE FROM mx_items;
     DELETE FROM mx_delivery_addresses;
+    DELETE FROM mx_agents;
+    DELETE FROM mx_parties;
     DELETE FROM mx_godowns;
     DELETE FROM mx_job_workers;
     DELETE FROM mx_suppliers;

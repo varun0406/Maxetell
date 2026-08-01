@@ -184,6 +184,24 @@ export function printAgingReport(rows: any[]) {
 export function printDeliveryChallan(challan: any) {
   const reqs = challan.requirements ?? [];
   const scans = challan.scans ?? [];
+
+  const partyName = challan.party_name_master || challan.party_name || challan.addr_party || "—";
+  const partyLines = [
+    challan.party_address_line,
+    [challan.party_city, challan.party_state].filter(Boolean).join(", "),
+    challan.party_gstin ? `GSTIN: ${challan.party_gstin}` : "",
+    challan.party_phone ? `Phone: ${challan.party_phone}` : "",
+  ].filter(Boolean);
+
+  const shipName = challan.ship_label || challan.addr_party || partyName;
+  const shipLines = [
+    challan.ship_address_line || challan.address_line,
+    [challan.ship_city || challan.city, challan.ship_state || challan.state].filter(Boolean).join(", "),
+    challan.ship_phone ? `Phone: ${challan.ship_phone}` : "",
+  ].filter(Boolean);
+
+  const agent = challan.agent_display || challan.agent_name || "—";
+
   const body = `
     ${header("Delivery Challan")}
     <table style="border:none;margin-bottom:12px">
@@ -192,14 +210,32 @@ export function printDeliveryChallan(challan: any) {
           <div class="muted">Challan No</div>
           <div style="font-size:22px;font-weight:800">${escapeHtml(challan.challan_no)}</div>
           <div class="muted">Date: ${escapeHtml(challan.challan_date)} · Status: ${escapeHtml(challan.status)}</div>
+          <div style="margin-top:8px"><span class="muted">Agent:</span> <strong>${escapeHtml(agent)}</strong>
+            ${challan.agent_phone ? ` · ${escapeHtml(challan.agent_phone)}` : ""}
+          </div>
         </td>
-        <td style="border:none;width:50%;vertical-align:top">
-          <div class="muted">Deliver to</div>
-          <div style="font-weight:700">${escapeHtml(challan.party_name || challan.addr_party || "—")}</div>
-          <div>${escapeHtml(challan.address_line ?? "")}</div>
-          <div>${escapeHtml([challan.city, challan.state].filter(Boolean).join(", "))}</div>
-        </td>
+        <td style="border:none;width:50%;vertical-align:top"></td>
       </tr>
+    </table>
+    <table style="margin-bottom:14px">
+      <thead>
+        <tr>
+          <th style="width:50%">Party (billing)</th>
+          <th style="width:50%">Deliver to (ship)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="vertical-align:top">
+            <div style="font-weight:700">${escapeHtml(partyName)}</div>
+            ${partyLines.map((l) => `<div>${escapeHtml(l)}</div>`).join("")}
+          </td>
+          <td style="vertical-align:top">
+            <div style="font-weight:700">${escapeHtml(shipName)}</div>
+            ${shipLines.map((l) => `<div>${escapeHtml(l)}</div>`).join("")}
+          </td>
+        </tr>
+      </tbody>
     </table>
     <h2>Required materials</h2>
     <table>
@@ -236,7 +272,7 @@ export function printDeliveryChallan(challan: any) {
     ${challan.notes ? `<p><strong>Notes:</strong> ${escapeHtml(challan.notes)}</p>` : ""}
     <div style="margin-top:40px;display:flex;justify-content:space-between">
       <div>Prepared by _______________</div>
-      <div>Received by _______________</div>
+      <div>Agent / Received by _______________</div>
     </div>
     <div class="footer">Maxwell Delivery Challan · Save as PDF from print dialog</div>
   `;

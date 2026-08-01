@@ -5,6 +5,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WEB_ROOT="${WEB_ROOT:-/var/www/maxwell}"
 API_SERVICE="${API_SERVICE:-maxwell-api}"
+API_PORT="${API_PORT:-3002}"
 
 cd "$REPO_ROOT"
 echo "==> install"
@@ -23,5 +24,5 @@ sudo systemctl restart "$API_SERVICE"
 sudo systemctl reload nginx
 
 echo "==> smoke"
-curl -fsS http://127.0.0.1:3001/health && echo ""
+curl -fsS "http://127.0.0.1:${API_PORT}/health" && echo ""
 echo "OK. Test: curl -fsS https://maxwell.rovark.in/api/health"
