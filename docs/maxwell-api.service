@@ -1,0 +1,14 @@
+[Unit]
+Description=Maxwell Trading API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/maxwell
+EnvironmentFile=/etc/maxwell/api.env
+ExecStart=/usr/bin/npm run start -w @maxwell/api
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

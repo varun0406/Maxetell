@@ -14,10 +14,17 @@ function daysAgo(n: number) {
   return d.toISOString().slice(0, 10);
 }
 
-/** Rich demo dataset for Maxwell — only runs when mx_items is empty */
-export function seedMaxwellDemo(db: Db) {
-  const count = (db.prepare(`SELECT COUNT(1) AS c FROM mx_items`).get() as { c: number }).c;
-  if (count > 0) return;
+/** Rich demo dataset for Maxwell — runs when empty/sparse, or when force=true */
+export function seedMaxwellDemo(db: Db, opts?: { force?: boolean }) {
+  const itemCount = (db.prepare(`SELECT COUNT(1) AS c FROM mx_items`).get() as { c: number }).c;
+  const packingCount = (db.prepare(`SELECT COUNT(1) AS c FROM mx_packings`).get() as { c: number }).c;
+  const rollCount = (db.prepare(`SELECT COUNT(1) AS c FROM mx_rolls`).get() as { c: number }).c;
+
+  const sparse = itemCount > 0 && (packingCount < 5 || rollCount < 8);
+  if (!opts?.force && itemCount > 0 && !sparse) return;
+  if (opts?.force || sparse) {
+    clearMaxwellDemo(db);
+  }
 
   const txn = db.transaction(() => {
     const insSup = db.prepare(`INSERT INTO mx_suppliers(name, contact) VALUES (?,?)`);
@@ -228,4 +235,34 @@ export function seedMaxwellDemo(db: Db) {
   });
 
   txn();
+}
+
+export function clearMaxwellDemo(db: Db) {
+  db.exec(`
+    DELETE FROM mx_challan_scans;
+    DELETE FROM mx_challan_requirements;
+    DELETE FROM mx_challans;
+    DELETE FROM mx_parcel_items;
+    DELETE FROM mx_parcels;
+    DELETE FROM mx_packings;
+    DELETE FROM mx_job_work;
+    DELETE FROM mx_rolls;
+    DELETE FROM mx_item_variants;
+    DELETE FROM mx_items;
+    DELETE FROM mx_delivery_addresses;
+    DELETE FROM mx_godowns;
+    DELETE FROM mx_job_workers;
+    DELETE FROM mx_suppliers;
+    DELETE FROM mx_sync_conflicts;
+  `);
+}
+
+export function reseedMaxwellDemo(db: Db) {
+  seedMaxwellDemo(db, { force: true });
+  return {
+    items: (db.prepare(`SELECT COUNT(1) AS c FROM mx_items`).get() as { c: number }).c,
+    rolls: (db.prepare(`SELECT COUNT(1) AS c FROM mx_rolls`).get() as { c: number }).c,
+    packings: (db.prepare(`SELECT COUNT(1) AS c FROM mx_packings`).get() as { c: number }).c,
+    challans: (db.prepare(`SELECT COUNT(1) AS c FROM mx_challans`).get() as { c: number }).c,
+  };
 }

@@ -1,12 +1,6 @@
-/** Open a print window with HTML — user saves as PDF from browser print dialog */
-
+/** Print via hidden iframe — avoids popup blockers (no window.open) */
 export function openPrintWindow(title: string, bodyHtml: string) {
-  const w = window.open("", "_blank", "noopener,noreferrer,width=900,height=1100");
-  if (!w) {
-    alert("Allow pop-ups to print / save PDF");
-    return;
-  }
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title>
 <style>
   @page { margin: 14mm; }
   * { box-sizing: border-box; }
@@ -29,12 +23,48 @@ export function openPrintWindow(title: string, bodyHtml: string) {
   .sticker .meters { font-size: 28px; font-weight: 800; }
   .sticker .code { font-family: ui-monospace, monospace; font-weight: 700; font-size: 14px; }
   .barcode { font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.12em; margin-top: 8px; border-top: 1px dashed #999; padding-top: 6px; word-break: break-all; }
-  @media print { button { display: none !important; } body { padding: 0; } }
+  @media print { body { padding: 0; } }
 </style></head><body>
 ${bodyHtml}
-<script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
-</body></html>`);
-  w.document.close();
+</body></html>`;
+
+  let iframe = document.getElementById("mx-print-frame") as HTMLIFrameElement | null;
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = "mx-print-frame";
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;";
+    document.body.appendChild(iframe);
+  }
+
+  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+  if (!doc) {
+    console.error("[print] iframe document unavailable");
+    return;
+  }
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  const win = iframe.contentWindow;
+  if (!win) return;
+
+  // Wait for layout, then open native print dialog (Save as PDF works here)
+  const trigger = () => {
+    try {
+      win.focus();
+      win.print();
+    } catch (e) {
+      console.error("[print]", e);
+    }
+  };
+
+  if (doc.readyState === "complete") {
+    setTimeout(trigger, 150);
+  } else {
+    iframe.onload = () => setTimeout(trigger, 150);
+  }
 }
 
 function escapeHtml(s: string) {

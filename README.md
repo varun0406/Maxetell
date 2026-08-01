@@ -50,9 +50,16 @@ VITE_API_BASE_URL=https://maxwell.rovark.in/api npm run build
 npm run cap:sync
 ```
 
-Printer: Device & Sync screen → LAN host + port 9100 (ZPL). Without a printer, last ZPL is stored in `localStorage.mx_last_zpl`.
+## Production (maxwell.rovark.in)
 
-## Product map
+Full guide: [docs/DEPLOY.md](docs/DEPLOY.md)
+
+```bash
+# on server, from repo root after first-time nginx/systemd setup:
+./scripts/deploy.sh
+```
+
+Nginx sample: `docs/nginx.maxwell.rovark.in.conf` · systemd: `docs/maxwell-api.service`
 
 | Area | Route / API |
 |---|---|

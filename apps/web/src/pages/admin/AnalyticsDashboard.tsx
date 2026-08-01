@@ -122,6 +122,18 @@ export function AnalyticsPage() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} flexWrap="wrap">
+          <Button
+            size="small"
+            color="warning"
+            variant="outlined"
+            onClick={async () => {
+              if (!confirm("Load full demo stock data? This replaces current Maxwell stock.")) return;
+              await api.post("/mx/demo/reseed");
+              await load();
+            }}
+          >
+            Load demo data
+          </Button>
           <Button size="small" startIcon={<PictureAsPdfIcon />} variant="outlined" onClick={() => printStockByVariantReport(byVariant, t)}>
             Variant PDF
           </Button>

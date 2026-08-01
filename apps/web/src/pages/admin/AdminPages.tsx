@@ -388,6 +388,21 @@ export function SettingsSyncPage() {
         >
           Sync now
         </Button>
+        <Button
+          variant="outlined"
+          color="warning"
+          onClick={async () => {
+            if (!confirm("Replace all Maxwell stock data with full demo seed?")) return;
+            try {
+              const r = await api.post("/mx/demo/reseed");
+              setMsg(`Demo loaded: ${r.data.data.rolls} rolls, ${r.data.data.packings} packings, ${r.data.data.challans} challans`);
+            } catch (e: any) {
+              setMsg(e?.response?.data?.error ?? "Reseed failed — restart API first");
+            }
+          }}
+        >
+          Load demo data
+        </Button>
       </Stack>
       {msg && <Alert severity="info">{msg}</Alert>}
       <Typography fontWeight={700} mt={2} mb={1}>

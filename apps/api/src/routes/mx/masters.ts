@@ -122,4 +122,10 @@ export async function registerMxMastersRoutes(app: FastifyInstance, opts: { db: 
     db.prepare(`UPDATE mx_delivery_addresses SET deleted_at=?, updated_at=? WHERE id=?`).run(nowIso(), nowIso(), Number((req.params as any).id));
     return { ok: true };
   });
+
+  app.post("/mx/demo/reseed", async () => {
+    const { reseedMaxwellDemo } = await import("../../seed.js");
+    const counts = reseedMaxwellDemo(db);
+    return { ok: true, data: counts };
+  });
 }
