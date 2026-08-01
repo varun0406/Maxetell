@@ -16,7 +16,11 @@ import {
   TableRow,
   Paper,
   MenuItem,
+  Grid,
+  Divider,
 } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import AddIcon from "@mui/icons-material/Add";
 import { api, createAppUser, deleteAppUser, fetchAppUsers, type AppUserRow } from "../../lib/api";
 import { getPrinterConfig, setPrinterConfig } from "../../lib/print/zpl";
 import { runSyncOnce } from "../../offline/syncWorker";
@@ -27,6 +31,288 @@ export { AnalyticsPage } from "./AnalyticsDashboard";
 function TabPanel({ value, index, children }: { value: number; index: number; children: React.ReactNode }) {
   if (value !== index) return null;
   return <Box sx={{ pt: 2 }}>{children}</Box>;
+}
+
+function ItemCharterModular({
+  items,
+  variants,
+  onReload,
+}: {
+  items: any[];
+  variants: any[];
+  onReload: () => Promise<void>;
+}) {
+  const [openId, setOpenId] = useState<number | null>(null);
+  const [showNewItem, setShowNewItem] = useState(false);
+  const [itemForm, setItemForm] = useState({ code: "", name: "", quality: "" });
+  const [varForm, setVarForm] = useState({ variant_code: "", variant_name: "", color: "" });
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const openItem = items.find((i) => i.id === openId) ?? null;
+  const itemVariants = variants.filter((v) => v.item_id === openId);
+
+  async function createItem() {
+    if (!itemForm.code.trim() || !itemForm.name.trim()) return;
+    await api.post("/mx/items", itemForm);
+    setItemForm({ code: "", name: "", quality: "" });
+    setShowNewItem(false);
+    setMsg("Item created");
+    await onReload();
+  }
+
+  async function createVariant() {
+    if (!openId || !varForm.variant_code.trim() || !varForm.variant_name.trim()) return;
+    await api.post("/mx/variants", { ...varForm, item_id: openId });
+    setVarForm({ variant_code: "", variant_name: "", color: "" });
+    setMsg("Variant added");
+    await onReload();
+  }
+
+  if (openItem) {
+    return (
+      <Box>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => setOpenId(null)} sx={{ mb: 2 }}>
+          All items
+        </Button>
+        {msg && (
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMsg(null)}>
+            {msg}
+          </Alert>
+        )}
+
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 2.5, md: 3 },
+            mb: 3,
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            background: "linear-gradient(145deg, rgba(25,118,210,0.1) 0%, rgba(255,255,255,0) 55%)",
+          }}
+        >
+          <Typography variant="overline" color="primary" fontWeight={800} letterSpacing={0.12}>
+            Item charter
+          </Typography>
+          <Typography variant="h4" fontWeight={900} letterSpacing={-0.6}>
+            {openItem.code}
+          </Typography>
+          <Typography variant="h6" color="text.secondary" fontWeight={500}>
+            {openItem.name}
+            {openItem.quality ? ` · ${openItem.quality}` : ""}
+          </Typography>
+          <Chip sx={{ mt: 1.5 }} label={`${itemVariants.length} variants`} color="primary" variant="outlined" />
+        </Paper>
+
+        <Paper
+          elevation={0}
+          sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}
+        >
+          <Typography fontWeight={800} mb={1.5}>
+            Add variant to this item
+          </Typography>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
+            <TextField
+              size="small"
+              label="Variant code"
+              value={varForm.variant_code}
+              onChange={(e) => setVarForm({ ...varForm, variant_code: e.target.value })}
+              sx={{ minWidth: 120 }}
+            />
+            <TextField
+              size="small"
+              label="Variant name"
+              value={varForm.variant_name}
+              onChange={(e) => setVarForm({ ...varForm, variant_name: e.target.value })}
+              sx={{ flex: 1 }}
+            />
+            <TextField
+              size="small"
+              label="Color"
+              value={varForm.color}
+              onChange={(e) => setVarForm({ ...varForm, color: e.target.value })}
+              sx={{ minWidth: 120 }}
+            />
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => void createVariant()}>
+              Add
+            </Button>
+          </Stack>
+        </Paper>
+
+        <Typography
+          variant="subtitle2"
+          color="text.secondary"
+          sx={{ mb: 1.5, letterSpacing: 0.1, textTransform: "uppercase" }}
+        >
+          Variants inside {openItem.code}
+        </Typography>
+        <Grid container spacing={2}>
+          {itemVariants.map((v) => (
+            <Grid key={v.id} size={{ xs: 12, sm: 6, md: 4 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  height: "100%",
+                  borderRadius: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  transition: "border-color .15s, box-shadow .15s",
+                  "&:hover": { borderColor: "primary.main", boxShadow: 2 },
+                }}
+              >
+                <Typography fontFamily="monospace" fontWeight={900} fontSize="1.35rem" color="primary.main">
+                  {v.variant_code}
+                </Typography>
+                <Typography fontWeight={700} mt={0.5}>
+                  {v.variant_name}
+                </Typography>
+                <Divider sx={{ my: 1.5 }} />
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Chip size="small" label={v.color || "No color"} />
+                  <Chip size="small" variant="outlined" label={openItem.quality || "—"} />
+                </Stack>
+              </Paper>
+            </Grid>
+          ))}
+          {!itemVariants.length && (
+            <Grid size={12}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 4,
+                  textAlign: "center",
+                  borderRadius: 3,
+                  border: "1px dashed",
+                  borderColor: "divider",
+                  color: "text.secondary",
+                }}
+              >
+                No variants yet — add the first color / shade above.
+              </Paper>
+            </Grid>
+          )}
+        </Grid>
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "center" }} mb={2} gap={1}>
+        <Box>
+          <Typography variant="h6" fontWeight={800}>
+            Items
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Open an item to manage its variants as modules.
+          </Typography>
+        </Box>
+        <Button variant={showNewItem ? "outlined" : "contained"} startIcon={<AddIcon />} onClick={() => setShowNewItem((v) => !v)}>
+          {showNewItem ? "Cancel" : "New item"}
+        </Button>
+      </Stack>
+
+      {msg && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMsg(null)}>
+          {msg}
+        </Alert>
+      )}
+
+      {showNewItem && (
+        <Paper elevation={0} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid", borderColor: "primary.light" }}>
+          <Typography fontWeight={800} mb={1.5}>
+            Create item
+          </Typography>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <TextField size="small" label="Code" value={itemForm.code} onChange={(e) => setItemForm({ ...itemForm, code: e.target.value })} />
+            <TextField size="small" label="Name" value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} sx={{ flex: 1 }} />
+            <TextField size="small" label="Quality" value={itemForm.quality} onChange={(e) => setItemForm({ ...itemForm, quality: e.target.value })} />
+            <Button variant="contained" onClick={() => void createItem()}>
+              Save item
+            </Button>
+          </Stack>
+        </Paper>
+      )}
+
+      <Grid container spacing={2}>
+        {items.map((it) => {
+          const count = variants.filter((v) => v.item_id === it.id).length;
+          const preview = variants.filter((v) => v.item_id === it.id).slice(0, 4);
+          return (
+            <Grid key={it.id} size={{ xs: 12, sm: 6, lg: 4 }}>
+              <Paper
+                elevation={0}
+                onClick={() => setOpenId(it.id)}
+                sx={{
+                  p: 2.5,
+                  height: "100%",
+                  borderRadius: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  cursor: "pointer",
+                  transition: "transform .12s, border-color .12s, box-shadow .12s",
+                  "&:hover": {
+                    transform: "translateY(-2px)",
+                    borderColor: "primary.main",
+                    boxShadow: 3,
+                  },
+                }}
+              >
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                  <Box>
+                    <Typography variant="overline" color="primary" fontWeight={800}>
+                      {it.code}
+                    </Typography>
+                    <Typography variant="h6" fontWeight={800} lineHeight={1.2}>
+                      {it.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" mt={0.5}>
+                      {it.quality || "No quality set"}
+                    </Typography>
+                  </Box>
+                  <Chip size="small" color="primary" variant="outlined" label={`${count} var`} />
+                </Stack>
+                <Divider sx={{ my: 1.5 }} />
+                <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                  {preview.map((v) => (
+                    <Chip key={v.id} size="small" label={v.variant_code} sx={{ fontFamily: "monospace" }} />
+                  ))}
+                  {count > 4 && <Chip size="small" variant="outlined" label={`+${count - 4}`} />}
+                  {!count && (
+                    <Typography variant="caption" color="text.secondary">
+                      Empty — open to add variants
+                    </Typography>
+                  )}
+                </Stack>
+              </Paper>
+            </Grid>
+          );
+        })}
+        {!items.length && (
+          <Grid size={12}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 5,
+                textAlign: "center",
+                borderRadius: 3,
+                border: "1px dashed",
+                borderColor: "divider",
+              }}
+            >
+              <Typography color="text.secondary" mb={2}>
+                No items yet. Create your first cloth item.
+              </Typography>
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowNewItem(true)}>
+                New item
+              </Button>
+            </Paper>
+          </Grid>
+        )}
+      </Grid>
+    </Box>
+  );
 }
 
 export function MastersPage() {
@@ -40,8 +326,6 @@ export function MastersPage() {
   const [parties, setParties] = useState<any[]>([]);
   const [agents, setAgents] = useState<any[]>([]);
 
-  const [itemForm, setItemForm] = useState({ code: "", name: "", quality: "" });
-  const [varForm, setVarForm] = useState({ item_id: 0, variant_code: "", variant_name: "", color: "" });
   const [supForm, setSupForm] = useState({ name: "", contact: "" });
   const [jwForm, setJwForm] = useState({ name: "", contact: "", job_work_type: "" });
   const [gForm, setGForm] = useState({ code: "", name: "", location: "" });
@@ -90,10 +374,13 @@ export function MastersPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={800} gutterBottom>
+      <Typography variant="h4" fontWeight={900} letterSpacing={-0.5} gutterBottom>
         Masters
       </Typography>
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable">
+      <Typography color="text.secondary" mb={2}>
+        Parties, agents, godowns, and the item charter.
+      </Typography>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ borderBottom: 1, borderColor: "divider" }}>
         <Tab label="Item Charter" />
         <Tab label="Parties" />
         <Tab label="Ship-to" />
@@ -104,61 +391,7 @@ export function MastersPage() {
       </Tabs>
 
       <TabPanel value={tab} index={0}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} mb={2}>
-          <TextField size="small" label="Code" value={itemForm.code} onChange={(e) => setItemForm({ ...itemForm, code: e.target.value })} />
-          <TextField size="small" label="Name" value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} />
-          <TextField size="small" label="Quality" value={itemForm.quality} onChange={(e) => setItemForm({ ...itemForm, quality: e.target.value })} />
-          <Button
-            variant="contained"
-            onClick={async () => {
-              await api.post("/mx/items", itemForm);
-              setItemForm({ code: "", name: "", quality: "" });
-              await load();
-            }}
-          >
-            Add item
-          </Button>
-        </Stack>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} mb={2}>
-          <TextField select size="small" label="Item" value={varForm.item_id} onChange={(e) => setVarForm({ ...varForm, item_id: Number(e.target.value) })} sx={{ minWidth: 160 }}>
-            {items.map((i) => (
-              <MenuItem key={i.id} value={i.id}>
-                {i.code} — {i.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField size="small" label="Variant code" value={varForm.variant_code} onChange={(e) => setVarForm({ ...varForm, variant_code: e.target.value })} />
-          <TextField size="small" label="Variant name" value={varForm.variant_name} onChange={(e) => setVarForm({ ...varForm, variant_name: e.target.value })} />
-          <TextField size="small" label="Color" value={varForm.color} onChange={(e) => setVarForm({ ...varForm, color: e.target.value })} />
-          <Button
-            variant="outlined"
-            onClick={async () => {
-              await api.post("/mx/variants", varForm);
-              setVarForm({ item_id: varForm.item_id, variant_code: "", variant_name: "", color: "" });
-              await load();
-            }}
-          >
-            Add variant
-          </Button>
-        </Stack>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Variant</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Color</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {variants.map((v) => (
-              <TableRow key={v.id}>
-                <TableCell sx={{ fontFamily: "monospace" }}>{v.variant_code}</TableCell>
-                <TableCell>{v.variant_name}</TableCell>
-                <TableCell>{v.color}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <ItemCharterModular items={items} variants={variants} onReload={load} />
       </TabPanel>
 
       <TabPanel value={tab} index={1}>
