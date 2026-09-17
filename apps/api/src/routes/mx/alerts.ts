@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { Db } from "../../../db.js";
+import type { Db } from "../../db.js";
 
 export async function registerMxAlertsRoutes(app: FastifyInstance, opts: { db: Db }) {
   const { db } = opts;

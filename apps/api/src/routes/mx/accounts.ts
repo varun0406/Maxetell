@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { Db } from "../../../db.js";
+import type { Db } from "../../db.js";
 
 function nowIso() {
   return new Date().toISOString();
