@@ -29,6 +29,7 @@ export function ProcurementWorkspace() {
   const [purchaseBills, setPurchaseBills] = useState<any[]>([]);
   const [jobWorkBills, setJobWorkBills] = useState<any[]>([]);
   const [jobWorkers, setJobWorkers] = useState<any[]>([]);
+  const [pipelineData, setPipelineData] = useState<any>(null);
 
   const [jwBillForm, setJwBillForm] = useState({
     job_worker_id: 0,
@@ -83,6 +84,7 @@ export function ProcurementWorkspace() {
         <Tabs value={tab} onChange={(_, v) => setTab(v)} textColor="secondary" indicatorColor="secondary">
           <Tab label="Purchase Bills (Material)" />
           <Tab label="Job Work Bills (Process)" />
+          <Tab label="Inventory Pipeline (Traceability)" />
         </Tabs>
       </Box>
 
@@ -185,6 +187,74 @@ export function ProcurementWorkspace() {
             </TableBody>
           </Table>
         </TableContainer>
+      </TabPanel>
+
+      {/* Inventory Pipeline */}
+      <TabPanel value={tab} index={2}>
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 4, mb: 4 }}>
+          <Typography variant="h6" mb={1}>Material Lifecycle Tracker</Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Select a Purchase Bill to trace exactly where every meter of material is right now.
+          </Typography>
+          
+          <Grid container spacing={3} alignItems="center">
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Autocomplete
+                options={purchaseBills}
+                getOptionLabel={(b) => `${b.bill_no} (${new Date(b.bill_date).toLocaleDateString()})`}
+                onChange={async (_, newValue) => {
+                  if (newValue?.bill_no) {
+                    const res = await api.get(`/mx/analytics/inventory-pipeline?bill_no=${newValue.bill_no}`);
+                    setPipelineData(res.data.data);
+                  } else {
+                    setPipelineData(null);
+                  }
+                }}
+                renderInput={(params) => <TextField {...params} label="Select Purchase Bill" />}
+                fullWidth
+              />
+            </Grid>
+            {pipelineData && (
+              <Grid size={{ xs: 12 }}>
+                <Paper sx={{ p: 3, bgcolor: "grey.50", border: "1px dashed", borderColor: "grey.300" }}>
+                  <Typography variant="h5" fontWeight={800} mb={3}>
+                    Purchased Total: {pipelineData.total_purchased.toFixed(1)}m
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Box sx={{ p: 2, bgcolor: "info.50", borderRadius: 2, color: "info.dark" }}>
+                        <Typography variant="caption" fontWeight={700}>In Godown (Raw)</Typography>
+                        <Typography variant="h6" fontWeight={900}>{pipelineData.inward_stock.toFixed(1)}m</Typography>
+                        <Typography variant="caption">{((pipelineData.inward_stock / (pipelineData.total_purchased || 1)) * 100).toFixed(0)}%</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Box sx={{ p: 2, bgcolor: "warning.50", borderRadius: 2, color: "warning.dark" }}>
+                        <Typography variant="caption" fontWeight={700}>At Process House (WIP)</Typography>
+                        <Typography variant="h6" fontWeight={900}>{pipelineData.at_job_work.toFixed(1)}m</Typography>
+                        <Typography variant="caption">{((pipelineData.at_job_work / (pipelineData.total_purchased || 1)) * 100).toFixed(0)}%</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Box sx={{ p: 2, bgcolor: "success.50", borderRadius: 2, color: "success.dark" }}>
+                        <Typography variant="caption" fontWeight={700}>Ready for Sale (Returned)</Typography>
+                        <Typography variant="h6" fontWeight={900}>{pipelineData.in_cutting.toFixed(1)}m</Typography>
+                        <Typography variant="caption">{((pipelineData.in_cutting / (pipelineData.total_purchased || 1)) * 100).toFixed(0)}%</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Box sx={{ p: 2, bgcolor: "error.50", borderRadius: 2, color: "error.dark" }}>
+                        <Typography variant="caption" fontWeight={700}>Sold / Dispatched</Typography>
+                        <Typography variant="h6" fontWeight={900}>{pipelineData.depleted.toFixed(1)}m</Typography>
+                        <Typography variant="caption">{((pipelineData.depleted / (pipelineData.total_purchased || 1)) * 100).toFixed(0)}%</Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Grid>
+            )}
+          </Grid>
+        </Paper>
       </TabPanel>
     </Box>
   );

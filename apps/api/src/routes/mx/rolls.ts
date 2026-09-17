@@ -13,11 +13,13 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
     const { status, q } = req.query as { status?: string; q?: string };
     let sql = `
       SELECT r.*, r.roll_id AS job_id, COALESCE(r.lot_no, r.short_code) AS lot_display,
-             s.name AS supplier_name, v.variant_name, v.color, i.code AS item_code, i.name AS item_name, i.quality
+             s.name AS supplier_name, v.variant_name, v.color, i.code AS item_code, i.name AS item_name, i.quality,
+             pb.bill_no AS purchase_bill_no
       FROM mx_rolls r
       JOIN mx_suppliers s ON s.id = r.supplier_id
       LEFT JOIN mx_item_variants v ON v.variant_code = r.variant_code
       LEFT JOIN mx_items i ON i.id = v.item_id
+      LEFT JOIN mx_purchase_bills pb ON pb.id = r.purchase_bill_id
       WHERE r.deleted_at IS NULL
     `;
     const params: any[] = [];
@@ -148,10 +150,12 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
     const rows = db
       .prepare(
         `
-      SELECT j.*, w.name AS worker_name, r.short_code AS roll_short, r.variant_code
+      SELECT j.*, w.name AS worker_name, r.short_code AS roll_short, r.variant_code, pb.bill_no AS purchase_bill_no, s.name AS supplier_name
       FROM mx_job_work j
       JOIN mx_job_workers w ON w.id = j.job_worker_id
       JOIN mx_rolls r ON r.roll_id = j.roll_id
+      LEFT JOIN mx_purchase_bills pb ON pb.id = r.purchase_bill_id
+      LEFT JOIN mx_suppliers s ON s.id = r.supplier_id
       WHERE j.deleted_at IS NULL
       ORDER BY j.outward_date DESC
     `,

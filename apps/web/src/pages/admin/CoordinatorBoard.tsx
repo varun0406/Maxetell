@@ -109,7 +109,7 @@ export function CoordinatorBoard() {
                         Ref: {job.job_work_ref || "—"} | {job.meters_outstanding}m sent
                       </Typography>
                       <Typography variant="caption" color="text.secondary" display="block">
-                        {job.roll_short} · {job.variant_code}
+                        {job.roll_short} · {job.variant_code} | Bill: <strong>{job.purchase_bill_no || "N/A"}</strong>
                       </Typography>
                     </CardContent>
                   </Card>
@@ -138,6 +138,9 @@ export function CoordinatorBoard() {
                       </Stack>
                       <Typography variant="caption" display="block">
                         Ref: {job.job_work_ref || "—"} | {job.meter_returned}m returned
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Bill: <strong>{job.purchase_bill_no || "N/A"}</strong>
                       </Typography>
                       <Button 
                         size="small" 

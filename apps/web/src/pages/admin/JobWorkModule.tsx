@@ -37,10 +37,13 @@ export function JobWorkModule() {
   const [showNewWorker, setShowNewWorker] = useState(false);
 
   const [jwForm, setJwForm] = useState({ name: "", contact: "", job_work_type: "" });
-  const [outForm, setOutForm] = useState({
-    roll_id: "",
+  const [outForm, setOutForm] = useState<{
+    roll_ids: string[];
+    job_worker_id: number;
+    outward_date: string;
+  }>({
+    roll_ids: [],
     job_worker_id: 0,
-    meter_sent: 0,
     outward_date: new Date().toISOString().slice(0, 10)
   });
   const [searchWorkers, setSearchWorkers] = useState("");
@@ -112,17 +115,18 @@ export function JobWorkModule() {
           </Typography>
           
           <Grid container spacing={3}>
-            <Grid  size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 8 }}>
               <Autocomplete
-                options={rolls.filter((r) => r.remaining_meterage > 0)}
-                getOptionLabel={(r) => `${r.lot_no || r.short_code} (${r.remaining_meterage}m available)`}
-                value={rolls.find((r) => r.roll_id === outForm.roll_id) || null}
-                onChange={(_, newValue) => setOutForm({ ...outForm, roll_id: newValue?.roll_id || "" })}
-                renderInput={(params) => <TextField {...params} label="Select Lot / Roll" />}
+                multiple
+                options={rolls.filter((r) => r.remaining_meterage > 0 && r.status === 'inward')}
+                getOptionLabel={(r) => `${r.lot_no || r.short_code} | ${r.variant_code} | ${r.remaining_meterage}m | Bill: ${r.purchase_bill_no || 'N/A'}`}
+                value={rolls.filter((r) => outForm.roll_ids.includes(r.roll_id))}
+                onChange={(_, newValue) => setOutForm({ ...outForm, roll_ids: newValue.map(v => v.roll_id) })}
+                renderInput={(params) => <TextField {...params} label="Select Lots / Rolls to Dispatch" placeholder="Add rolls..." />}
                 fullWidth
               />
             </Grid>
-            <Grid  size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Autocomplete
                 options={workers}
                 getOptionLabel={(w) => w.name}
@@ -132,25 +136,31 @@ export function JobWorkModule() {
                 fullWidth
               />
             </Grid>
-            <Grid  size={{ xs: 12, sm: 6, md: 2 }}>
-              <TextField 
-                fullWidth type="number" label="Meters Sent" 
-                value={outForm.meter_sent || ""} 
-                onChange={(e) => setOutForm({ ...outForm, meter_sent: Number(e.target.value) })} 
-              />
-            </Grid>
-            <Grid  size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid size={{ xs: 12 }}>
               <Button
                 variant="contained" fullWidth sx={{ height: 56, background: "linear-gradient(135deg, #a855f7, #ec4899)" }}
                 onClick={async () => {
-                  if (!outForm.roll_id || !outForm.job_worker_id || !outForm.meter_sent) return;
-                  await api.post("/mx/job-work/out", outForm);
-                  setOutForm({ ...outForm, meter_sent: 0, roll_id: "" });
+                  if (outForm.roll_ids.length === 0 || !outForm.job_worker_id) return;
+                  
+                  // Send each roll
+                  for (const rollId of outForm.roll_ids) {
+                    const roll = rolls.find(r => r.roll_id === rollId);
+                    if (roll) {
+                      await api.post("/mx/job-work/out", {
+                        roll_id: rollId,
+                        job_worker_id: outForm.job_worker_id,
+                        outward_date: outForm.outward_date,
+                        meter_sent: roll.remaining_meterage // Dispatch entire roll
+                      });
+                    }
+                  }
+                  
+                  setOutForm({ ...outForm, roll_ids: [] });
                   await load();
                   setTab(1); // Jump to receive
                 }}
               >
-                Dispatch
+                Dispatch {outForm.roll_ids.length > 0 ? `${outForm.roll_ids.length} Rolls` : ""}
               </Button>
             </Grid>
           </Grid>
@@ -181,7 +191,9 @@ export function JobWorkModule() {
                 </Box>
                 <Box sx={{ flex: 1 }}>
                   <Typography fontWeight={800} sx={{ fontFamily: "monospace", fontSize: "1.1rem" }}>{j.roll_short}</Typography>
-                  <Typography variant="body2" color="text.secondary">Outward Date: {new Date(j.created_at).toLocaleDateString()}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Outward Date: {new Date(j.created_at).toLocaleDateString()} | Bill: <strong>{j.purchase_bill_no || "N/A"}</strong> ({j.supplier_name || "Unknown Mill"})
+                  </Typography>
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary">Processor</Typography>

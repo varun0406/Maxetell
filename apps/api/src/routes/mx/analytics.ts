@@ -40,6 +40,7 @@ export async function registerMxAnalyticsRoutes(app: FastifyInstance, opts: { db
       )
       .get();
 
+
     const millWip = db
       .prepare(
         `
@@ -98,6 +99,39 @@ export async function registerMxAnalyticsRoutes(app: FastifyInstance, opts: { db
         open_conflicts: openConflicts,
       },
     };
+  });
+
+  app.get("/mx/analytics/inventory-pipeline", async (req) => {
+    const { bill_no, supplier_id } = req.query as { bill_no?: string; supplier_id?: string };
+    
+    let baseJoin = ``;
+    let whereClause = `WHERE r.deleted_at IS NULL`;
+    const params: any[] = [];
+    
+    if (bill_no) {
+      baseJoin = `LEFT JOIN mx_purchase_bills pb ON pb.id = r.purchase_bill_id`;
+      whereClause += ` AND pb.bill_no = ?`;
+      params.push(bill_no);
+    } else if (supplier_id) {
+      whereClause += ` AND r.supplier_id = ?`;
+      params.push(supplier_id);
+    }
+
+    // Pipeline breaks down the *original meterage* of purchased rolls by their *current* lifecycle status.
+    const sql = `
+      SELECT 
+        COALESCE(SUM(r.original_meterage), 0) AS total_purchased,
+        COALESCE(SUM(CASE WHEN r.status = 'inward' THEN r.remaining_meterage ELSE 0 END), 0) AS inward_stock,
+        COALESCE(SUM(CASE WHEN r.status = 'at_job_work' THEN r.remaining_meterage ELSE 0 END), 0) AS at_job_work,
+        COALESCE(SUM(CASE WHEN r.status = 'in_cutting' THEN r.remaining_meterage ELSE 0 END), 0) AS in_cutting,
+        COALESCE(SUM(CASE WHEN r.status = 'depleted' THEN r.original_meterage ELSE 0 END), 0) AS depleted
+      FROM mx_rolls r
+      ${baseJoin}
+      ${whereClause}
+    `;
+    
+    const pipeline = db.prepare(sql).get(...params);
+    return { data: pipeline };
   });
 
   /** Stock breakdown by variant — core owner view */
@@ -481,12 +515,13 @@ export async function registerMxAnalyticsRoutes(app: FastifyInstance, opts: { db
     const open = db
       .prepare(
         `
-      SELECT j.*, w.name AS worker_name, w.job_work_type, r.short_code AS roll_short, r.variant_code,
+      SELECT j.*, w.name AS worker_name, w.job_work_type, r.short_code AS roll_short, r.variant_code, pb.bill_no AS purchase_bill_no,
              CAST((julianday('now') - julianday(j.outward_date)) AS INTEGER) AS days_out,
              (j.meter_sent - COALESCE(j.meter_returned,0)) AS meters_outstanding
       FROM mx_job_work j
       JOIN mx_job_workers w ON w.id = j.job_worker_id
       JOIN mx_rolls r ON r.roll_id = j.roll_id
+      LEFT JOIN mx_purchase_bills pb ON pb.id = r.purchase_bill_id
       WHERE j.deleted_at IS NULL AND j.processed_state = 'outward'
       ORDER BY days_out DESC
     `,
@@ -496,11 +531,12 @@ export async function registerMxAnalyticsRoutes(app: FastifyInstance, opts: { db
     const awaitingConfirm = db
       .prepare(
         `
-      SELECT j.*, w.name AS worker_name, r.short_code AS roll_short, r.variant_code,
+      SELECT j.*, w.name AS worker_name, r.short_code AS roll_short, r.variant_code, pb.bill_no AS purchase_bill_no,
              COALESCE(j.shortage_meters, 0) AS shortage_meters
       FROM mx_job_work j
       JOIN mx_job_workers w ON w.id = j.job_worker_id
       JOIN mx_rolls r ON r.roll_id = j.roll_id
+      LEFT JOIN mx_purchase_bills pb ON pb.id = r.purchase_bill_id
       WHERE j.deleted_at IS NULL
         AND j.processed_state IN ('inward','closed')
         AND j.received_confirmed_at IS NULL
