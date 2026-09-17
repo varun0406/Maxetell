@@ -186,16 +186,17 @@ export function FloorChallanPage() {
     }
   }
 
-  async function doScan() {
-    if (!active || !scan.trim()) return;
+  async function doScan(overrideRef?: string) {
+    const ref = overrideRef || scan.trim();
+    if (!active || !ref) return;
     try {
       await api.post(`/mx/challans/${active.challan_id}/scan`, {
         scan_id: newId(),
         scan_type: scanType,
-        scanned_ref: scan.trim(),
+        scanned_ref: ref,
         scanned_at: new Date().toISOString(),
       });
-      setMsg({ ok: true, text: `Scanned ${scan.trim()}` });
+      setMsg({ ok: true, text: `Scanned ${ref}` });
       setFlash("success");
       setScan("");
       await openChallan(active.challan_id);
@@ -235,6 +236,9 @@ export function FloorChallanPage() {
   const reqs: any[] = active?.requirements ?? [];
   const scans: any[] = active?.scans ?? [];
   const pick_list: any[] = active?.pick_list ?? [];
+  
+  const pick_list_flat = pick_list.flatMap(g => g.racks.flatMap((r: any) => r.packings.map((p: any) => ({ ...p, rack: r.rack }))));
+  const available_packings = pick_list_flat.filter(p => !scans.some(s => s.scanned_ref === p.short_code));
 
 
 
@@ -325,6 +329,30 @@ export function FloorChallanPage() {
         <option value="packing">Packing</option>
         <option value="parcel">Parcel</option>
       </select>
+      
+      {scanType === "packing" && available_packings.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div className="floor-label">Or Select Packing Manually</div>
+          <select 
+            className="floor-select" 
+            value="" 
+            onChange={(e) => {
+              if (e.target.value) {
+                setScanType("packing");
+                void doScan(e.target.value);
+              }
+            }}
+          >
+            <option value="">-- Choose from Pick List --</option>
+            {available_packings.map(p => (
+              <option key={p.packing_id} value={p.short_code}>
+                {p.short_code} · {p.variant_code} ({p.length_meters}m) - Rack: {p.rack}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <input
         className="floor-input floor-mono"
         placeholder="Scan packing / parcel…"
