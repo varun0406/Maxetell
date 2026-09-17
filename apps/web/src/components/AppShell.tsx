@@ -26,6 +26,7 @@ import ContentCutOutlinedIcon from "@mui/icons-material/ContentCutOutlined";
 import SyncOutlinedIcon from "@mui/icons-material/SyncOutlined";
 import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
+import ReceiptIcon from "@mui/icons-material/Receipt";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { AlertsWidget } from "./AlertsWidget.tsx";
 import { clearAuthToken } from "../lib/auth";
@@ -115,7 +116,20 @@ export function AppShell() {
               <ListItemIcon sx={{ minWidth: 36 }}>
                 <AccountBalanceIcon />
               </ListItemIcon>
-              <ListItemText primary="Accounts" primaryTypographyProps={{ fontWeight: 600 }} />
+              <ListItemText primary="Accounts Workspace" primaryTypographyProps={{ fontWeight: 600 }} />
+            </ListItemButton>
+          </ListItem>
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/procurement"
+              selected={loc.pathname.startsWith("/procurement")}
+              sx={{ borderRadius: 2, mb: 0.5 }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <ReceiptIcon />
+              </ListItemIcon>
+              <ListItemText primary="Procurement Bills" primaryTypographyProps={{ fontWeight: 600 }} />
             </ListItemButton>
           </ListItem>
           {nav

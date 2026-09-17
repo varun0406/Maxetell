@@ -122,7 +122,7 @@ export function AccountsWorkspace() {
           <Table>
             <TableHead>
               <TableRow sx={{ bgcolor: "grey.50" }}>
-                <TableCell>Supplier</TableCell>
+                <TableCell>Entity</TableCell>
                 <TableCell align="right">Total Billed</TableCell>
                 <TableCell align="right">Total Paid</TableCell>
                 <TableCell align="right">Outstanding Balance</TableCell>
@@ -132,8 +132,11 @@ export function AccountsWorkspace() {
               {summary.payables.map((p: any) => {
                 const out = p.total_billed - p.total_paid;
                 return (
-                  <TableRow key={p.id}>
-                    <TableCell sx={{ fontWeight: 600 }}>{p.name}</TableCell>
+                  <TableRow key={`${p.role}-${p.id}`}>
+                    <TableCell>
+                      <Box sx={{ fontWeight: 600 }}>{p.name}</Box>
+                      <Typography variant="caption" color="text.secondary">{p.role}</Typography>
+                    </TableCell>
                     <TableCell align="right">₹{p.total_billed.toLocaleString()}</TableCell>
                     <TableCell align="right">₹{p.total_paid.toLocaleString()}</TableCell>
                     <TableCell align="right" sx={{ color: out > 0 ? "error.main" : "text.primary", fontWeight: 700 }}>

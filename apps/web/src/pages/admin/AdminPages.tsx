@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Route, Routes } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -20,8 +21,23 @@ import { api, createAppUser, deleteAppUser, fetchAppUsers, type AppUserRow } fro
 import { getPrinterConfig, setPrinterConfig } from "../../lib/print/zpl";
 import { runSyncOnce } from "../../offline/syncWorker";
 import { listPendingOutbox } from "../../offline/localDb";
+import { ItemCatalogPage } from "./ItemCatalogPage";
+import { AccountsWorkspace } from "./AccountsWorkspace";
+import { ProcurementWorkspace } from "./ProcurementWorkspace";
 
 export { AnalyticsPage } from "./AnalyticsDashboard";
+
+export function AdminPages() {
+  return (
+    <Routes>
+      <Route path="/" element={<SettingsSyncPage />} />
+      <Route path="users" element={<UsersAdminPage />} />
+      <Route path="items" element={<ItemCatalogPage />} />
+      <Route path="accounts" element={<AccountsWorkspace />} />
+      <Route path="procurement" element={<ProcurementWorkspace />} />
+    </Routes>
+  );
+}
 
 export function SettingsSyncPage() {
   const [host, setHost] = useState(getPrinterConfig()?.host ?? "");
