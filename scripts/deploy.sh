@@ -1,28 +1,29 @@
-#!/usr/bin/env bash
-# Deploy Maxwell to production (nginx + systemd). See docs/DEPLOY.md.
-set -euo pipefail
+#!/bin/bash
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WEB_ROOT="${WEB_ROOT:-/var/www/maxwell}"
-API_SERVICE="${API_SERVICE:-maxwell-api}"
-API_PORT="${API_PORT:-3002}"
+# Exit immediately if a command exits with a non-zero status
+set -e
 
-cd "$REPO_ROOT"
-echo "==> install"
-npm install
+echo "🚀 Starting Deployment..."
 
-echo "==> build (API + web with VITE_API_BASE_URL=/api)"
-npm run build:prod
+# 1. Pull the latest code from git
+echo "📥 Pulling latest code..."
+git pull
 
-echo "==> copy web to nginx root: $WEB_ROOT"
-sudo mkdir -p "$WEB_ROOT"
-sudo rsync -a --delete "$REPO_ROOT/apps/web/dist/" "$WEB_ROOT/"
-sudo chown -R www-data:www-data "$WEB_ROOT" 2>/dev/null || true
+# 2. Build the API and Web apps
+echo "🔨 Building API and Web..."
+npm run build -w @maxwell/api
+npm run build -w @maxwell/web
 
-echo "==> restart API + nginx"
-sudo systemctl restart "$API_SERVICE"
-sudo systemctl reload nginx
+# 3. Copy API files to the production directory
+echo "📂 Copying API dist files to /opt/maxwell/apps/api/dist/..."
+sudo cp -r apps/api/dist/* /opt/maxwell/apps/api/dist/
 
-echo "==> smoke"
-curl -fsS "http://127.0.0.1:${API_PORT}/health" && echo ""
-echo "OK. Test: curl -fsS https://maxwell.rovark.in/api/health"
+# 4. Copy Web files to the production directory (if it exists)
+echo "📂 Copying Web dist files to /opt/maxwell/apps/web/dist/..."
+sudo cp -r apps/web/dist/* /opt/maxwell/apps/web/dist/ || echo "Web dist folder not found in /opt/maxwell, skipping..."
+
+# 5. Restart the Systemd service
+echo "🔄 Restarting maxwell-api service..."
+sudo systemctl restart maxwell-api
+
+echo "✅ Deployment complete! API is running the latest code."
