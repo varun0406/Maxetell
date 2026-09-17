@@ -54,7 +54,7 @@ export function CoordinatorBoard() {
 
       <Grid container spacing={2} sx={{ flexGrow: 1, overflow: "hidden" }}>
         {/* Panel 1: Ready to Send */}
-        <Grid item xs={12} md={4} sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <Grid size={{ xs: 12, md: 4 }} sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <Paper sx={{ p: 2, bgcolor: "grey.100", height: "100%", display: "flex", flexDirection: "column" }}>
             <Typography variant="subtitle1" fontWeight={700} mb={2}>
               Ready to Send ({data.ready.length})
@@ -91,7 +91,7 @@ export function CoordinatorBoard() {
         </Grid>
 
         {/* Panel 2: Currently Out */}
-        <Grid item xs={12} md={4} sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <Grid size={{ xs: 12, md: 4 }} sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <Paper sx={{ p: 2, bgcolor: "primary.50", height: "100%", display: "flex", flexDirection: "column" }}>
             <Typography variant="subtitle1" fontWeight={700} mb={2} color="primary.dark">
               Currently Out ({data.open.length})
@@ -120,7 +120,7 @@ export function CoordinatorBoard() {
         </Grid>
 
         {/* Panel 3: Awaiting Validation */}
-        <Grid item xs={12} md={4} sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <Grid size={{ xs: 12, md: 4 }} sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <Paper sx={{ p: 2, bgcolor: "warning.50", height: "100%", display: "flex", flexDirection: "column" }}>
             <Typography variant="subtitle1" fontWeight={700} mb={2} color="warning.dark">
               Awaiting Validation ({data.awaiting_confirm.length})

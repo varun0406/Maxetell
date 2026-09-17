@@ -11,6 +11,8 @@ import {
 import { ItemCatalogPage } from "./pages/admin/ItemCatalogPage.tsx";
 import { SuppliersModule } from "./pages/admin/SuppliersModule.tsx";
 import { JobWorkModule } from "./pages/admin/JobWorkModule.tsx";
+import { JobWorkerAccountPage } from "./pages/admin/JobWorkerAccountPage.tsx";
+import { CoordinatorBoard } from "./pages/admin/CoordinatorBoard.tsx";
 import { PartiesModule } from "./pages/admin/PartiesModule.tsx";
 import { AgentsModule } from "./pages/admin/AgentsModule.tsx";
 import { GodownsModule } from "./pages/admin/GodownsModule.tsx";
@@ -35,6 +37,8 @@ export default function App() {
             <Route path="items" element={<ItemCatalogPage />} />
             <Route path="suppliers" element={<SuppliersModule />} />
             <Route path="job-work" element={<JobWorkModule />} />
+            <Route path="job-work/worker/:id" element={<JobWorkerAccountPage />} />
+            <Route path="coordinator" element={<CoordinatorBoard />} />
             <Route path="parties" element={<PartiesModule />} />
             <Route path="agents" element={<AgentsModule />} />
             <Route path="godowns" element={<GodownsModule />} />

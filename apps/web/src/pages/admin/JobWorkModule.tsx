@@ -12,11 +12,13 @@ import {
   Tabs,
   TextField,
   Typography,
+  MenuItem,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
 import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing";
 import { api } from "../../lib/api";
+import { useNavigate } from "react-router-dom";
 
 function TabPanel({ value, index, children }: { value: number; index: number; children: React.ReactNode }) {
   if (value !== index) return null;
@@ -40,6 +42,8 @@ export function JobWorkModule() {
   const [meters, setMeters] = useState<Record<string, number>>({});
   const [searchJobs, setSearchJobs] = useState("");
   const [searchWorkers, setSearchWorkers] = useState("");
+  const [qualityResults, setQualityResults] = useState<Record<string, string>>({});
+  const navigate = useNavigate();
 
   async function load() {
     const [w, j, r] = await Promise.all([
@@ -177,6 +181,18 @@ export function JobWorkModule() {
                     value={meters[j.job_work_id] ?? j.meter_sent}
                     onChange={(e) => setMeters({ ...meters, [j.job_work_id]: Number(e.target.value) })}
                   />
+                  <TextField
+                    select
+                    size="small"
+                    label="Quality"
+                    sx={{ width: 120 }}
+                    value={qualityResults[j.job_work_id] || "accepted"}
+                    onChange={(e) => setQualityResults({ ...qualityResults, [j.job_work_id]: e.target.value })}
+                  >
+                    <MenuItem value="accepted">Accepted</MenuItem>
+                    <MenuItem value="defect">Defect</MenuItem>
+                    <MenuItem value="rejected">Rejected</MenuItem>
+                  </TextField>
                   <Button
                     variant="contained" color="secondary"
                     onClick={async () => {
@@ -185,6 +201,8 @@ export function JobWorkModule() {
                         inward_date: new Date().toISOString().slice(0, 10),
                         received_by: "warehouse",
                         confirm_receive: true,
+                        quality_result: qualityResults[j.job_work_id] || "accepted",
+                        quality_notes: qualityNotes[j.job_work_id] || "",
                       });
                       await load();
                     }}
@@ -243,7 +261,12 @@ export function JobWorkModule() {
             .filter((w) => w.name?.toLowerCase().includes(searchWorkers.toLowerCase()) || w.job_work_type?.toLowerCase().includes(searchWorkers.toLowerCase()))
             .map((w, idx) => (
             <Grid key={w.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
+              <Paper 
+                elevation={0} 
+                sx={{ p: 3, height: "100%", borderRadius: 4, cursor: "pointer", "&:hover": { borderColor: "primary.main", borderWidth: 2, borderStyle: "solid", m: "-2px" } }} 
+                className={`stagger-${(idx % 5) + 1}`}
+                onClick={() => navigate(`/job-work/worker/${w.id}`)}
+              >
                 <Typography variant="h6" fontWeight={800}>{w.name}</Typography>
                 <Stack direction="row" spacing={1} mt={2}>
                   <Chip size="small" color="secondary" variant="outlined" label={w.job_work_type || "General"} />

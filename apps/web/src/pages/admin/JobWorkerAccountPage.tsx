@@ -58,7 +58,7 @@ export function JobWorkerAccountPage() {
       {/* Header Block */}
       <Paper sx={{ p: 3, mb: 3, borderLeft: "6px solid", borderColor: "primary.main" }}>
         <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Stack direction="row" alignItems="center" spacing={2} mb={1}>
               <PrecisionManufacturingIcon fontSize="large" color="primary" />
               <Typography variant="h4" fontWeight={900}>{worker.name}</Typography>
@@ -72,9 +72,9 @@ export function JobWorkerAccountPage() {
             </Typography>
           </Grid>
 
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Grid container spacing={2}>
-              <Grid item xs={6}>
+              <Grid size={{ xs: 6 }}>
                 <Paper variant="outlined" sx={{ p: 1.5, textAlign: "center", height: "100%" }}>
                   <Typography variant="caption" color="text.secondary">Avg Turnaround</Typography>
                   <Typography variant="h6" fontWeight={700}>
@@ -82,7 +82,7 @@ export function JobWorkerAccountPage() {
                   </Typography>
                 </Paper>
               </Grid>
-              <Grid item xs={6}>
+              <Grid size={{ xs: 6 }}>
                 <Paper variant="outlined" sx={{ p: 1.5, textAlign: "center", height: "100%" }}>
                   <Typography variant="caption" color="text.secondary">Total Shortage</Typography>
                   <Typography variant="h6" fontWeight={700} color={stats.shortage_pct > 2 ? "error.main" : "text.primary"}>
@@ -128,7 +128,7 @@ export function JobWorkerAccountPage() {
                 const over = capacity.default_turnaround_days && j.days_out > capacity.default_turnaround_days;
                 return (
                   <TableRow key={j.job_work_id}>
-                    <TableCell fontWeight={600}>{j.job_work_ref || "—"}</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>{j.job_work_ref || "—"}</TableCell>
                     <TableCell>{j.lot_display}</TableCell>
                     <TableCell>{j.item_name} · {j.variant_code}</TableCell>
                     <TableCell align="right">{(j.meter_sent - (j.meter_returned ?? 0)).toFixed(1)}</TableCell>
@@ -159,7 +159,7 @@ export function JobWorkerAccountPage() {
 
       <TabPanel value={tab} index={1}>
         <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight={800} gutterBottom>Capacity Overview</Typography>
               <Stack spacing={2} mt={2}>
