@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Badge, IconButton, Popover, List, ListItem, ListItemText, Typography, Box, Chip } from "@mui/material";
 import NotificationsIcon from "@mui/icons-material/Notifications";
-import { api } from "../../lib/api";
+import { api } from "../lib/api";
 
 export function AlertsWidget() {
   const [alerts, setAlerts] = useState<any[]>([]);
