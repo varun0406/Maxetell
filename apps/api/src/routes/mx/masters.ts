@@ -217,6 +217,17 @@ export async function registerMxMastersRoutes(app: FastifyInstance, opts: { db: 
       WHERE j.job_worker_id = ? AND j.deleted_at IS NULL AND j.processed_state IN ('inward','closed')
     `).get(id);
 
+    // Ledger calculations
+    const payments = db.prepare(`SELECT * FROM mx_payments WHERE entity_type='job_worker' AND entity_id=? AND deleted_at IS NULL ORDER BY payment_date DESC`).all(id);
+    const total_billed = db.prepare(`SELECT SUM(total_amount) as t FROM mx_job_work_bills WHERE job_worker_id=? AND deleted_at IS NULL`).get(id) as any;
+    const total_paid = db.prepare(`SELECT SUM(amount) as t FROM mx_payments WHERE entity_type='job_worker' AND entity_id=? AND deleted_at IS NULL`).get(id) as any;
+    const ledger = {
+      total_billed: total_billed.t || 0,
+      total_paid: total_paid.t || 0,
+      outstanding: (total_billed.t || 0) - (total_paid.t || 0),
+      payments
+    };
+
     return {
       data: {
         worker,
@@ -225,6 +236,7 @@ export async function registerMxMastersRoutes(app: FastifyInstance, opts: { db: 
         capacity: capacityInfo,
         history,
         stats,
+        ledger,
       },
     };
   });
