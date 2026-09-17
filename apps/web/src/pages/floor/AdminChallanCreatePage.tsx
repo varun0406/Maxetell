@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, Button, Chip, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, MenuItem, Stack, TextField, Typography, Autocomplete } from "@mui/material";
 import { api } from "../../lib/api";
 
 export function AdminChallanCreatePage() {
@@ -45,40 +45,29 @@ export function AdminChallanCreatePage() {
           value={form.challan_date}
           onChange={(e) => setForm({ ...form, challan_date: e.target.value })}
         />
-        <TextField
-          select
-          label="Party (billing)"
-          value={form.party_id}
-          onChange={(e) => setForm({ ...form, party_id: Number(e.target.value), address_id: 0 })}
-        >
-          <MenuItem value={0}>—</MenuItem>
-          {parties.map((p) => (
-            <MenuItem key={p.id} value={p.id}>
-              {p.name} {p.gstin ? `· ${p.gstin}` : ""}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          select
-          label="Deliver to (ship address)"
-          value={form.address_id}
-          onChange={(e) => setForm({ ...form, address_id: Number(e.target.value) })}
-        >
-          <MenuItem value={0}>—</MenuItem>
-          {shipOptions.map((a) => (
-            <MenuItem key={a.id} value={a.id}>
-              {a.party_name} · {a.address_line ?? ""} {a.city ?? ""}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField select label="Agent" value={form.agent_id} onChange={(e) => setForm({ ...form, agent_id: Number(e.target.value) })}>
-          <MenuItem value={0}>—</MenuItem>
-          {agents.map((a) => (
-            <MenuItem key={a.id} value={a.id}>
-              {a.name}
-            </MenuItem>
-          ))}
-        </TextField>
+        <Autocomplete
+          options={parties}
+          getOptionLabel={(p) => p.name + (p.gstin ? ` · ${p.gstin}` : "")}
+          value={parties.find(p => p.id === form.party_id) || null}
+          onChange={(_, newValue) => setForm({ ...form, party_id: newValue?.id || 0, address_id: 0 })}
+          renderInput={(params) => <TextField {...params} label="Party (billing)" />}
+        />
+        
+        <Autocomplete
+          options={shipOptions}
+          getOptionLabel={(a) => `${a.party_name} · ${a.address_line ?? ""} ${a.city ?? ""}`}
+          value={shipOptions.find(a => a.id === form.address_id) || null}
+          onChange={(_, newValue) => setForm({ ...form, address_id: newValue?.id || 0 })}
+          renderInput={(params) => <TextField {...params} label="Deliver to (ship address)" />}
+        />
+
+        <Autocomplete
+          options={agents}
+          getOptionLabel={(a) => a.name}
+          value={agents.find(a => a.id === form.agent_id) || null}
+          onChange={(_, newValue) => setForm({ ...form, agent_id: newValue?.id || 0 })}
+          renderInput={(params) => <TextField {...params} label="Agent" />}
+        />
         <TextField label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
 
         <Typography fontWeight={700}>Requirements</Typography>
@@ -91,24 +80,17 @@ export function AdminChallanCreatePage() {
           </Stack>
         ))}
         <Stack direction="row" spacing={1}>
-          <TextField
-            select
-            size="small"
-            label="Variant"
-            sx={{ minWidth: 160 }}
-            defaultValue=""
-            onChange={(e) => {
-              const code = e.target.value;
-              if (!code) return;
-              setReqs([...reqs, { variant_code: code, required_meters: 0, required_pieces: 1 }]);
+          <Autocomplete
+            options={variants}
+            getOptionLabel={(v) => v.variant_code}
+            onChange={(_, newValue) => {
+              if (newValue) {
+                setReqs([...reqs, { variant_code: newValue.variant_code, required_meters: 0, required_pieces: 0 }]);
+              }
             }}
-          >
-            {variants.map((v) => (
-              <MenuItem key={v.variant_code} value={v.variant_code}>
-                {v.variant_code}
-              </MenuItem>
-            ))}
-          </TextField>
+            renderInput={(params) => <TextField {...params} label="Variant" size="small" />}
+            sx={{ minWidth: 160 }}
+          />
         </Stack>
 
         <Button
