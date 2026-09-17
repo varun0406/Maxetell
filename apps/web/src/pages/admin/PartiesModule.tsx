@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import {
+  Autocomplete,
   Box,
   Button,
   Chip,
   Divider,
   Grid,
-  MenuItem,
+
   Paper,
   Stack,
   Tab,
@@ -43,6 +44,8 @@ export function PartiesModule() {
     phone: "",
     label: "Deliver to",
   });
+  const [searchParties, setSearchParties] = useState("");
+  const [searchAddresses, setSearchAddresses] = useState("");
 
   async function load() {
     const [p, a] = await Promise.all([
@@ -176,9 +179,12 @@ export function PartiesModule() {
           <TabPanel value={tab} index={0}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
               <Typography variant="h6">Billing Parties</Typography>
-              <Button variant="contained" color="success" startIcon={<AddIcon />} onClick={() => setShowNewParty(!showNewParty)}>
-                {showNewParty ? "Cancel" : "Onboard Party"}
-              </Button>
+              <Stack direction="row" spacing={2}>
+                <TextField size="small" placeholder="Search parties..." value={searchParties} onChange={(e) => setSearchParties(e.target.value)} sx={{ width: 250 }} />
+                <Button variant="contained" color="success" startIcon={<AddIcon />} onClick={() => setShowNewParty(!showNewParty)}>
+                  {showNewParty ? "Cancel" : "Onboard Party"}
+                </Button>
+              </Stack>
             </Stack>
 
             {showNewParty && (
@@ -210,7 +216,9 @@ export function PartiesModule() {
             )}
 
             <Grid container spacing={3}>
-              {parties.map((p, idx) => {
+              {parties
+                .filter((p) => p.name?.toLowerCase().includes(searchParties.toLowerCase()) || p.gstin?.toLowerCase().includes(searchParties.toLowerCase()))
+                .map((p, idx) => {
                 const n = addresses.filter((a) => a.party_id === p.id).length;
                 return (
                   <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
@@ -247,27 +255,30 @@ export function PartiesModule() {
           <TabPanel value={tab} index={1}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
               <Typography variant="h6">All Ship-to Addresses</Typography>
-              <Button variant="contained" color="info" startIcon={<AddIcon />} onClick={() => setShowNewAddress(!showNewAddress)}>
-                {showNewAddress ? "Cancel" : "Add Orphan Ship-to"}
-              </Button>
+              <Stack direction="row" spacing={2}>
+                <TextField size="small" placeholder="Search addresses..." value={searchAddresses} onChange={(e) => setSearchAddresses(e.target.value)} sx={{ width: 250 }} />
+                <Button variant="contained" color="info" startIcon={<AddIcon />} onClick={() => setShowNewAddress(!showNewAddress)}>
+                  {showNewAddress ? "Cancel" : "Add Orphan Ship-to"}
+                </Button>
+              </Stack>
             </Stack>
 
             {showNewAddress && (
               <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 3, border: "1px solid rgba(14, 165, 233, 0.2)" }} className="animate-slide-down">
                 <Grid container spacing={2}>
                   <Grid  size={{ xs: 12, sm: 6, md: 3 }}>
-                    <TextField
-                      select fullWidth size="small" label="Link to Party"
-                      value={shipForm.party_id}
-                      onChange={(e) => {
-                        const id = Number(e.target.value);
-                        const p = parties.find((x) => x.id === id);
-                        setShipForm({ ...shipForm, party_id: id, party_name: p?.name ?? shipForm.party_name });
+                    <Autocomplete
+                      size="small"
+                      options={[{ id: 0, name: "— Orphan —" }, ...parties]}
+                      getOptionLabel={(p) => p.name}
+                      value={parties.find((x) => x.id === shipForm.party_id) || { id: 0, name: "— Orphan —" }}
+                      onChange={(_, newValue) => {
+                        const id = newValue?.id || 0;
+                        setShipForm({ ...shipForm, party_id: id, party_name: newValue?.name !== "— Orphan —" ? (newValue?.name ?? shipForm.party_name) : shipForm.party_name });
                       }}
-                    >
-                      <MenuItem value={0}>— Orphan —</MenuItem>
-                      {parties.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
-                    </TextField>
+                      renderInput={(params) => <TextField {...params} label="Link to Party" />}
+                      fullWidth
+                    />
                   </Grid>
                   <Grid  size={{ xs: 12, sm: 6, md: 3 }}>
                     <TextField fullWidth size="small" label="Label / name" value={shipForm.party_name} onChange={(e) => setShipForm({ ...shipForm, party_name: e.target.value })} />
@@ -299,7 +310,9 @@ export function PartiesModule() {
             )}
 
             <Grid container spacing={3}>
-              {addresses.map((a, idx) => (
+              {addresses
+                .filter((a) => a.party_name?.toLowerCase().includes(searchAddresses.toLowerCase()) || a.city?.toLowerCase().includes(searchAddresses.toLowerCase()))
+                .map((a, idx) => (
                 <Grid key={a.id} size={{ xs: 12, sm: 6, md: 4 }}>
                   <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
                     <Typography fontWeight={800}>{a.party_name}</Typography>

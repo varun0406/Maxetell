@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import {
+  Autocomplete,
   Box,
   Button,
   Chip,
   Grid,
-  MenuItem,
+
   Paper,
   Stack,
   Tab,
@@ -38,6 +39,8 @@ export function SuppliersModule() {
     received_date: new Date().toISOString().slice(0, 10),
     notes: "",
   });
+  const [searchSuppliers, setSearchSuppliers] = useState("");
+  const [searchRolls, setSearchRolls] = useState("");
 
   async function load() {
     const [s, r, i] = await Promise.all([
@@ -93,16 +96,14 @@ export function SuppliersModule() {
           
           <Grid container spacing={3}>
             <Grid  size={{ xs: 12, md: 4 }}>
-              <TextField 
-                select fullWidth label="Supplier" 
-                value={rollForm.supplier_id} 
-                onChange={(e) => setRollForm({ ...rollForm, supplier_id: Number(e.target.value) })}
-              >
-                <MenuItem value={0} disabled>Select Supplier...</MenuItem>
-                {suppliers.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
-                ))}
-              </TextField>
+              <Autocomplete
+                options={suppliers}
+                getOptionLabel={(s) => s.name}
+                value={suppliers.find((s) => s.id === rollForm.supplier_id) || null}
+                onChange={(_, newValue) => setRollForm({ ...rollForm, supplier_id: newValue?.id || 0 })}
+                renderInput={(params) => <TextField {...params} label="Supplier" />}
+                fullWidth
+              />
             </Grid>
             <Grid  size={{ xs: 12, md: 4 }}>
               <TextField 
@@ -113,18 +114,14 @@ export function SuppliersModule() {
               />
             </Grid>
             <Grid  size={{ xs: 12, md: 4 }}>
-              <TextField 
-                select fullWidth label="Item Variant" 
-                value={rollForm.variant_code} 
-                onChange={(e) => setRollForm({ ...rollForm, variant_code: e.target.value })}
-              >
-                <MenuItem value="" disabled>Select Variant...</MenuItem>
-                {variants.map((v) => (
-                  <MenuItem key={v.variant_code} value={v.variant_code}>
-                    {v.variant_code} {v.variant_name}
-                  </MenuItem>
-                ))}
-              </TextField>
+              <Autocomplete
+                options={variants}
+                getOptionLabel={(v) => `${v.variant_code} ${v.variant_name}`}
+                value={variants.find((v) => v.variant_code === rollForm.variant_code) || null}
+                onChange={(_, newValue) => setRollForm({ ...rollForm, variant_code: newValue?.variant_code || "" })}
+                renderInput={(params) => <TextField {...params} label="Item Variant" />}
+                fullWidth
+              />
             </Grid>
             <Grid  size={{ xs: 12, sm: 6, md: 4 }}>
               <TextField 
@@ -161,9 +158,12 @@ export function SuppliersModule() {
       <TabPanel value={tab} index={1}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h6">Suppliers List</Typography>
-          <Button variant="contained" color="info" startIcon={<AddIcon />} onClick={() => setShowNewSup(!showNewSup)}>
-            {showNewSup ? "Cancel" : "Add Supplier"}
-          </Button>
+          <Stack direction="row" spacing={2}>
+            <TextField size="small" placeholder="Search suppliers..." value={searchSuppliers} onChange={(e) => setSearchSuppliers(e.target.value)} sx={{ width: 250 }} />
+            <Button variant="contained" color="info" startIcon={<AddIcon />} onClick={() => setShowNewSup(!showNewSup)}>
+              {showNewSup ? "Cancel" : "Add Supplier"}
+            </Button>
+          </Stack>
         </Stack>
 
         {showNewSup && (
@@ -189,7 +189,9 @@ export function SuppliersModule() {
         )}
 
         <Grid container spacing={3}>
-          {suppliers.map((s, idx) => (
+          {suppliers
+            .filter((s) => s.name?.toLowerCase().includes(searchSuppliers.toLowerCase()))
+            .map((s, idx) => (
             <Grid key={s.id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
                 <Typography variant="h6" fontWeight={800}>{s.name}</Typography>
@@ -210,8 +212,14 @@ export function SuppliersModule() {
       </TabPanel>
 
       <TabPanel value={tab} index={2}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6">Lots History</Typography>
+          <TextField size="small" placeholder="Search lots..." value={searchRolls} onChange={(e) => setSearchRolls(e.target.value)} sx={{ width: 250 }} />
+        </Stack>
         <Grid container spacing={2}>
-          {rolls.map((r, idx) => (
+          {rolls
+            .filter((r) => r.lot_no?.toLowerCase().includes(searchRolls.toLowerCase()) || r.short_code?.toLowerCase().includes(searchRolls.toLowerCase()) || r.supplier_name?.toLowerCase().includes(searchRolls.toLowerCase()))
+            .map((r, idx) => (
             <Grid key={r.roll_id} size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 2, display: "flex", alignItems: "center", gap: 3, borderRadius: 3 }} className={`stagger-${(idx % 5) + 1}`}>
                 <Box sx={{ width: 48, height: 48, borderRadius: 2, background: "rgba(14, 165, 233, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>

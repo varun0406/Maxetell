@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import {
+  Autocomplete,
   Box,
   Button,
   Chip,
   Grid,
-  MenuItem,
+
   Paper,
   Stack,
   Tab,
@@ -37,6 +38,8 @@ export function JobWorkModule() {
     outward_date: new Date().toISOString().slice(0, 10)
   });
   const [meters, setMeters] = useState<Record<string, number>>({});
+  const [searchJobs, setSearchJobs] = useState("");
+  const [searchWorkers, setSearchWorkers] = useState("");
 
   async function load() {
     const [w, j, r] = await Promise.all([
@@ -92,30 +95,24 @@ export function JobWorkModule() {
           
           <Grid container spacing={3}>
             <Grid  size={{ xs: 12, md: 4 }}>
-              <TextField 
-                select fullWidth label="Select Lot / Roll" 
-                value={outForm.roll_id} 
-                onChange={(e) => setOutForm({ ...outForm, roll_id: e.target.value })}
-              >
-                <MenuItem value="" disabled>Select Lot...</MenuItem>
-                {rolls.filter((r) => r.remaining_meterage > 0).map((r) => (
-                  <MenuItem key={r.roll_id} value={r.roll_id}>
-                    {r.lot_no || r.short_code} ({r.remaining_meterage}m available)
-                  </MenuItem>
-                ))}
-              </TextField>
+              <Autocomplete
+                options={rolls.filter((r) => r.remaining_meterage > 0)}
+                getOptionLabel={(r) => `${r.lot_no || r.short_code} (${r.remaining_meterage}m available)`}
+                value={rolls.find((r) => r.roll_id === outForm.roll_id) || null}
+                onChange={(_, newValue) => setOutForm({ ...outForm, roll_id: newValue?.roll_id || "" })}
+                renderInput={(params) => <TextField {...params} label="Select Lot / Roll" />}
+                fullWidth
+              />
             </Grid>
             <Grid  size={{ xs: 12, md: 4 }}>
-              <TextField 
-                select fullWidth label="Job Worker" 
-                value={outForm.job_worker_id} 
-                onChange={(e) => setOutForm({ ...outForm, job_worker_id: Number(e.target.value) })}
-              >
-                <MenuItem value={0} disabled>Select Processor...</MenuItem>
-                {workers.map((w) => (
-                  <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
-                ))}
-              </TextField>
+              <Autocomplete
+                options={workers}
+                getOptionLabel={(w) => w.name}
+                value={workers.find((w) => w.id === outForm.job_worker_id) || null}
+                onChange={(_, newValue) => setOutForm({ ...outForm, job_worker_id: newValue?.id || 0 })}
+                renderInput={(params) => <TextField {...params} label="Job Worker" />}
+                fullWidth
+              />
             </Grid>
             <Grid  size={{ xs: 12, sm: 6, md: 2 }}>
               <TextField 
@@ -143,8 +140,14 @@ export function JobWorkModule() {
       </TabPanel>
 
       <TabPanel value={tab} index={1}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6">Receive Returns</Typography>
+          <TextField size="small" placeholder="Search by roll or processor..." value={searchJobs} onChange={(e) => setSearchJobs(e.target.value)} sx={{ width: 250 }} />
+        </Stack>
         <Grid container spacing={2}>
-          {openJobs.map((j, idx) => (
+          {openJobs
+            .filter((j) => j.roll_short?.toLowerCase().includes(searchJobs.toLowerCase()) || j.worker_name?.toLowerCase().includes(searchJobs.toLowerCase()))
+            .map((j, idx) => (
             <Grid key={j.job_work_id} size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 3, display: "flex", alignItems: "center", gap: 3, borderRadius: 3 }} className={`stagger-${(idx % 5) + 1}`}>
                 <Box sx={{ width: 48, height: 48, borderRadius: 2, background: "rgba(168, 85, 247, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -205,9 +208,12 @@ export function JobWorkModule() {
       <TabPanel value={tab} index={2}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h6">Job Workers List</Typography>
-          <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={() => setShowNewWorker(!showNewWorker)}>
-            {showNewWorker ? "Cancel" : "Add Processor"}
-          </Button>
+          <Stack direction="row" spacing={2}>
+            <TextField size="small" placeholder="Search workers..." value={searchWorkers} onChange={(e) => setSearchWorkers(e.target.value)} sx={{ width: 250 }} />
+            <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={() => setShowNewWorker(!showNewWorker)}>
+              {showNewWorker ? "Cancel" : "Add Processor"}
+            </Button>
+          </Stack>
         </Stack>
 
         {showNewWorker && (
@@ -233,7 +239,9 @@ export function JobWorkModule() {
         )}
 
         <Grid container spacing={3}>
-          {workers.map((w, idx) => (
+          {workers
+            .filter((w) => w.name?.toLowerCase().includes(searchWorkers.toLowerCase()) || w.job_work_type?.toLowerCase().includes(searchWorkers.toLowerCase()))
+            .map((w, idx) => (
             <Grid key={w.id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
                 <Typography variant="h6" fontWeight={800}>{w.name}</Typography>

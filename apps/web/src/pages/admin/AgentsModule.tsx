@@ -15,6 +15,7 @@ import { api } from "../../lib/api";
 
 export function AgentsModule() {
   const [agents, setAgents] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
   const [showNewAgent, setShowNewAgent] = useState(false);
   const [agentForm, setAgentForm] = useState({ name: "", phone: "" });
 
@@ -26,6 +27,11 @@ export function AgentsModule() {
   useEffect(() => {
     void load();
   }, []);
+
+  const filteredAgents = agents.filter(a => 
+    a.name?.toLowerCase().includes(search.toLowerCase()) || 
+    a.phone?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <Box className="stagger-1">
@@ -43,9 +49,18 @@ export function AgentsModule() {
 
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h6">Agents Directory</Typography>
-        <Button variant="contained" color="error" startIcon={<AddIcon />} onClick={() => setShowNewAgent(!showNewAgent)}>
-          {showNewAgent ? "Cancel" : "Add Agent"}
-        </Button>
+        <Stack direction="row" spacing={2}>
+          <TextField
+            size="small"
+            placeholder="Search agents..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ width: 250 }}
+          />
+          <Button variant="contained" color="error" startIcon={<AddIcon />} onClick={() => setShowNewAgent(!showNewAgent)}>
+            {showNewAgent ? "Cancel" : "Add Agent"}
+          </Button>
+        </Stack>
       </Stack>
 
       {showNewAgent && (
@@ -71,7 +86,7 @@ export function AgentsModule() {
       )}
 
       <Grid container spacing={3}>
-        {agents.map((a, idx) => (
+        {filteredAgents.map((a, idx) => (
           <Grid key={a.id} size={{ xs: 12, sm: 6, md: 4 }}>
             <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
               <Typography variant="h6" fontWeight={800}>{a.name}</Typography>

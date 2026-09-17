@@ -43,8 +43,11 @@ function Metric({ label, value, accent }: { label: string; value: string; accent
 
 export function ItemCatalogPage() {
   const [items, setItems] = useState<any[]>([]);
+  const [searchItems, setSearchItems] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
   const [detail, setDetail] = useState<any>(null);
+  const [searchVariants, setSearchVariants] = useState("");
+  const [searchLots, setSearchLots] = useState("");
 
   const [showNewItem, setShowNewItem] = useState(false);
   const [itemForm, setItemForm] = useState({ code: "", name: "", quality: "" });
@@ -69,6 +72,17 @@ export function ItemCatalogPage() {
 
   if (openId && detail) {
     const { item, variants, lots } = detail;
+    
+    const filteredVariants = variants.filter((v: any) => 
+      v.variant_code?.toLowerCase().includes(searchVariants.toLowerCase()) || 
+      v.variant_name?.toLowerCase().includes(searchVariants.toLowerCase())
+    );
+
+    const filteredLots = lots.filter((l: any) => 
+      l.lot_no?.toLowerCase().includes(searchLots.toLowerCase()) || 
+      String(l.job_id).toLowerCase().includes(searchLots.toLowerCase())
+    );
+
     return (
       <Box className="animate-scale-in">
         <Button startIcon={<ArrowBackIcon />} onClick={() => { setOpenId(null); setDetail(null); }} sx={{ mb: 2 }}>
@@ -95,9 +109,18 @@ export function ItemCatalogPage() {
 
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h6">Variant Master</Typography>
-          <Button variant="contained" sx={{ background: "linear-gradient(135deg, #6366f1, #a855f7)" }} startIcon={<AddIcon />} onClick={() => setShowNewVar(!showNewVar)}>
-            {showNewVar ? "Cancel" : "Add Variant"}
-          </Button>
+          <Stack direction="row" spacing={2}>
+            <TextField
+              size="small"
+              placeholder="Search variants..."
+              value={searchVariants}
+              onChange={(e) => setSearchVariants(e.target.value)}
+              sx={{ width: 250 }}
+            />
+            <Button variant="contained" sx={{ background: "linear-gradient(135deg, #6366f1, #a855f7)" }} startIcon={<AddIcon />} onClick={() => setShowNewVar(!showNewVar)}>
+              {showNewVar ? "Cancel" : "Add Variant"}
+            </Button>
+          </Stack>
         </Stack>
 
         {showNewVar && (
@@ -124,7 +147,7 @@ export function ItemCatalogPage() {
         )}
 
         <Grid container spacing={3} mb={4}>
-          {variants.map((v: any, idx: number) => (
+          {filteredVariants.map((v: any, idx: number) => (
             <Grid key={v.variant_code} size={{ xs: 12, md: 6 }}>
               <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
                 <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
@@ -150,7 +173,7 @@ export function ItemCatalogPage() {
               </Paper>
             </Grid>
           ))}
-          {!variants.length && (
+          {!filteredVariants.length && (
             <Grid  size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
                 <Typography color="text.secondary">No variants for this item. Add the first color/shade above.</Typography>
@@ -159,7 +182,16 @@ export function ItemCatalogPage() {
           )}
         </Grid>
 
-        <Typography variant="h6" mb={2}>Active Lots (Job IDs)</Typography>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6">Active Lots (Job IDs)</Typography>
+          <TextField
+            size="small"
+            placeholder="Search lots..."
+            value={searchLots}
+            onChange={(e) => setSearchLots(e.target.value)}
+            sx={{ width: 250 }}
+          />
+        </Stack>
         <Paper elevation={0} sx={{ borderRadius: 4, border: "none", overflow: "hidden" }}>
           <Table size="small">
             <TableHead>
@@ -173,7 +205,7 @@ export function ItemCatalogPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {lots.map((l: any) => (
+              {filteredLots.map((l: any) => (
                 <TableRow key={l.job_id} hover>
                   <TableCell sx={{ fontFamily: "monospace", fontWeight: 700 }}>{l.lot_no}</TableCell>
                   <TableCell sx={{ fontFamily: "monospace", fontSize: 12, color: "text.secondary" }}>{String(l.job_id).slice(0, 8).toUpperCase()}</TableCell>
@@ -187,7 +219,7 @@ export function ItemCatalogPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {!lots.length && (
+              {!filteredLots.length && (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ color: "text.secondary", py: 3 }}>
                     No lots received yet for this item.
@@ -200,6 +232,11 @@ export function ItemCatalogPage() {
       </Box>
     );
   }
+
+  const filteredItems = items.filter(it => 
+    it.code?.toLowerCase().includes(searchItems.toLowerCase()) || 
+    it.name?.toLowerCase().includes(searchItems.toLowerCase())
+  );
 
   return (
     <Box className="stagger-1">
@@ -217,9 +254,18 @@ export function ItemCatalogPage() {
 
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h6">Item Directory</Typography>
-        <Button variant="contained" sx={{ background: "linear-gradient(135deg, #6366f1, #a855f7)" }} startIcon={<AddIcon />} onClick={() => setShowNewItem(!showNewItem)}>
-          {showNewItem ? "Cancel" : "Add Item"}
-        </Button>
+        <Stack direction="row" spacing={2}>
+          <TextField
+            size="small"
+            placeholder="Search items..."
+            value={searchItems}
+            onChange={(e) => setSearchItems(e.target.value)}
+            sx={{ width: 250 }}
+          />
+          <Button variant="contained" sx={{ background: "linear-gradient(135deg, #6366f1, #a855f7)" }} startIcon={<AddIcon />} onClick={() => setShowNewItem(!showNewItem)}>
+            {showNewItem ? "Cancel" : "Add Item"}
+          </Button>
+        </Stack>
       </Stack>
 
       {showNewItem && (
@@ -246,7 +292,7 @@ export function ItemCatalogPage() {
       )}
 
       <Grid container spacing={3}>
-        {items.map((it, idx) => (
+        {filteredItems.map((it, idx) => (
           <Grid key={it.id} size={{ xs: 12, sm: 6, lg: 4 }}>
             <Paper
               elevation={0}
@@ -275,7 +321,7 @@ export function ItemCatalogPage() {
             </Paper>
           </Grid>
         ))}
-        {!items.length && (
+        {!filteredItems.length && (
           <Grid  size={{ xs: 12 }}>
             <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
               <Typography color="text.secondary">No items yet. Create your first item.</Typography>

@@ -4,7 +4,7 @@ import {
   Box,
   Button,
   Chip,
-  MenuItem,
+
   Paper,
   Stack,
   Table,
@@ -15,6 +15,7 @@ import {
   TextField,
   Typography,
   Alert,
+  Autocomplete,
 } from "@mui/material";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { api } from "../../lib/api";
@@ -55,14 +56,15 @@ export function ChallansListPage() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
-          <TextField select size="small" label="Status" value={filter} onChange={(e) => setFilter(e.target.value)} sx={{ minWidth: 140 }}>
-            <MenuItem value="">All</MenuItem>
-            {["created", "assigned", "assembling", "dispatched", "delivered"].map((s) => (
-              <MenuItem key={s} value={s}>
-                {s}
-              </MenuItem>
-            ))}
-          </TextField>
+          <Autocomplete
+            size="small"
+            options={["All", "created", "assigned", "assembling", "dispatched", "delivered"]}
+            value={filter === "" ? "All" : filter}
+            onChange={(_, newValue) => setFilter(newValue === "All" || !newValue ? "" : newValue)}
+            renderInput={(params) => <TextField {...params} label="Status" />}
+            sx={{ minWidth: 140 }}
+            disableClearable
+          />
           <Button variant="contained" component={RouterLink} to="/challans/new">
             New challan
           </Button>

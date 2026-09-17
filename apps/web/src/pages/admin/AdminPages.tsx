@@ -13,7 +13,8 @@ import {
   TableHead,
   TableRow,
   Paper,
-  MenuItem,
+
+  Autocomplete,
 } from "@mui/material";
 import { api, createAppUser, deleteAppUser, fetchAppUsers, type AppUserRow } from "../../lib/api";
 import { getPrinterConfig, setPrinterConfig } from "../../lib/print/zpl";
@@ -132,13 +133,15 @@ export function UsersAdminPage() {
       <Stack direction="row" spacing={1} mb={2}>
         <TextField size="small" label="Username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
         <TextField size="small" type="password" label="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-        <TextField select size="small" label="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} sx={{ minWidth: 120 }}>
-          {["admin", "user", "packing", "godown", "floor"].map((r) => (
-            <MenuItem key={r} value={r}>
-              {r}
-            </MenuItem>
-          ))}
-        </TextField>
+        <Autocomplete
+          size="small"
+          options={["admin", "user", "packing", "godown", "floor"]}
+          value={form.role}
+          onChange={(_, newValue) => setForm({ ...form, role: newValue || "user" })}
+          renderInput={(params) => <TextField {...params} label="Role" />}
+          sx={{ minWidth: 120 }}
+          disableClearable
+        />
         <Button
           variant="contained"
           onClick={async () => {
