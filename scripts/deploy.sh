@@ -21,12 +21,15 @@ npm run build -w @maxwell/web
 echo "📂 Copying API dist files to /opt/maxwell/apps/api/dist/..."
 sudo cp -r apps/api/dist/* /opt/maxwell/apps/api/dist/
 
-# 4. Copy Web files to the production directory (if it exists)
-echo "📂 Copying Web dist files to /opt/maxwell/apps/web/dist/..."
-sudo cp -r apps/web/dist/* /opt/maxwell/apps/web/dist/ || echo "Web dist folder not found in /opt/maxwell, skipping..."
+# 4. Copy Web files to nginx production directory
+echo "📂 Copying Web dist files to /var/www/maxwell..."
+sudo mkdir -p /var/www/maxwell
+sudo rsync -a --delete apps/web/dist/ /var/www/maxwell/
+sudo chown -R www-data:www-data /var/www/maxwell 2>/dev/null || true
 
-# 5. Restart the Systemd service
-echo "🔄 Restarting maxwell-api service..."
+# 5. Restart the Systemd service and nginx
+echo "🔄 Restarting maxwell-api service and nginx..."
 sudo systemctl restart maxwell-api
+sudo systemctl reload nginx
 
-echo "✅ Deployment complete! API is running the latest code."
+echo "✅ Deployment complete! API and Web are running the latest code."
