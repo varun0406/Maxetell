@@ -13,7 +13,7 @@ import {
   Divider,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { api } from "../../lib/api";
+import { api } from "../lib/api";
 import { useNavigate } from "react-router-dom";
 
 type SearchResult = {

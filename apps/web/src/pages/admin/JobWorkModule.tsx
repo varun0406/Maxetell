@@ -202,7 +202,6 @@ export function JobWorkModule() {
                         received_by: "warehouse",
                         confirm_receive: true,
                         quality_result: qualityResults[j.job_work_id] || "accepted",
-                        quality_notes: qualityNotes[j.job_work_id] || "",
                       });
                       await load();
                     }}
