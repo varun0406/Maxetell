@@ -236,8 +236,6 @@ export function FloorChallanPage() {
   const scans: any[] = active?.scans ?? [];
   const pick_list: any[] = active?.pick_list ?? [];
 
-  const totalReqMeters = reqs.reduce((sum, r) => sum + r.required_meters, 0);
-  const totalScannedMeters = scans.reduce((sum, s) => sum + (s.scan_type === "packing" ? 100 : 0) /* placeholder, ideally backend sends this */, 0);
 
 
   if (!active) {
