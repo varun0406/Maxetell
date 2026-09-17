@@ -69,6 +69,7 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
         original_meterage: z.number().positive(),
         received_date: z.string().min(1),
         notes: z.string().optional(),
+        purchase_bill_id: z.number().int().positive().optional(),
       })
       .parse(req.body);
 
@@ -81,8 +82,8 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
     const job_id = body.roll_id ?? crypto.randomUUID();
     db.prepare(
       `
-      INSERT INTO mx_rolls(roll_id, short_code, lot_no, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, updated_at)
-      VALUES (?,?,?,?,?,?,?,'inward',?,?,?)
+      INSERT INTO mx_rolls(roll_id, short_code, lot_no, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, purchase_bill_id, updated_at)
+      VALUES (?,?,?,?,?,?,?,'inward',?,?,?,?)
     `,
     ).run(
       job_id,
@@ -94,6 +95,7 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
       body.original_meterage,
       body.received_date,
       body.notes ?? null,
+      body.purchase_bill_id ?? null,
       nowIso(),
     );
     return {
@@ -153,6 +155,7 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
         meter_sent: z.number().positive(),
         outward_date: z.string().min(1),
         notes: z.string().optional(),
+        job_work_ref: z.string().optional(),
       })
       .parse(req.body);
 
@@ -166,10 +169,10 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
     const txn = db.transaction(() => {
       db.prepare(
         `
-        INSERT INTO mx_job_work(job_work_id, roll_id, job_worker_id, outward_date, meter_sent, processed_state, notes, updated_at)
-        VALUES (?,?,?,?,?,'outward',?,?)
+        INSERT INTO mx_job_work(job_work_id, roll_id, job_worker_id, outward_date, meter_sent, processed_state, notes, job_work_ref, updated_at)
+        VALUES (?,?,?,?,?,'outward',?,?,?)
       `,
-      ).run(job_work_id, body.roll_id, body.job_worker_id, body.outward_date, body.meter_sent, body.notes ?? null, nowIso());
+      ).run(job_work_id, body.roll_id, body.job_worker_id, body.outward_date, body.meter_sent, body.notes ?? null, body.job_work_ref ?? null, nowIso());
       db.prepare(
         `UPDATE mx_rolls SET remaining_meterage = remaining_meterage - ?, status='at_job_work', updated_at=?, version=version+1 WHERE roll_id=?`,
       ).run(body.meter_sent, nowIso(), body.roll_id);
@@ -187,6 +190,8 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
         notes: z.string().optional(),
         received_by: z.string().optional(),
         confirm_receive: z.boolean().optional().default(true),
+        quality_result: z.enum(["accepted", "defect", "rejected"]).optional(),
+        quality_notes: z.string().optional(),
       })
       .parse(req.body);
 
@@ -206,6 +211,8 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
           shortage_meters=?,
           received_by=?,
           received_confirmed_at=?,
+          quality_result=?,
+          quality_notes=?,
           updated_at=?, version=version+1
         WHERE job_work_id=?
       `,
@@ -216,6 +223,8 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
         shortage,
         body.received_by ?? null,
         confirmedAt,
+        body.quality_result ?? null,
+        body.quality_notes ?? null,
         nowIso(),
         id,
       );

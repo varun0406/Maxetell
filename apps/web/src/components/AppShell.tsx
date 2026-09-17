@@ -29,6 +29,7 @@ import { clearAuthToken } from "../lib/auth";
 import { useAuthGate } from "./AuthGate.tsx";
 import { useEffect } from "react";
 import { startSyncWorker } from "../offline/syncWorker";
+import { UniversalSearchBar } from "./UniversalSearchBar";
 
 const drawerWidth = 260;
 
@@ -40,6 +41,7 @@ const nav = [
   { to: "/parties", label: "Parties & Ship-to", icon: <StorefrontIcon /> },
   { to: "/agents", label: "Agents", icon: <SupportAgentIcon /> },
   { to: "/godowns", label: "Godowns", icon: <WarehouseIcon /> },
+  { to: "/coordinator", label: "Coordinator Board", icon: <PrecisionManufacturingIcon /> },
   { to: "/challans", label: "Delivery Challans", icon: <ArticleOutlinedIcon /> },
   { to: "/challans/new", label: "New Challan", icon: <ArticleOutlinedIcon /> },
   { to: "/floor/cutting", label: "Floor App", icon: <ContentCutOutlinedIcon />, highlight: true },
@@ -91,6 +93,7 @@ export function AppShell() {
               Sign out
             </Button>
           ) : null}
+          <UniversalSearchBar />
         </Toolbar>
         <Divider />
         <List dense sx={{ px: 1, py: 1 }}>

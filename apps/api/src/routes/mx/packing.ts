@@ -135,6 +135,7 @@ export async function registerMxPackingRoutes(app: FastifyInstance, opts: { db: 
         packing_date: z.string().min(1),
         notes: z.string().optional(),
         device_id: z.string().optional(),
+        commercial_name: z.string().optional(),
       })
       .parse(req.body);
 
@@ -142,6 +143,10 @@ export async function registerMxPackingRoutes(app: FastifyInstance, opts: { db: 
     if (result.status === "rejected") return reply.code(400).send({ error: result.reason, status: result.status });
     if (result.status === "conflict") return reply.code(409).send({ error: result.reason, status: result.status });
     const row = db.prepare(`SELECT * FROM mx_packings WHERE packing_id=?`).get(body.packing_id);
+    // Set commercial_name if provided
+    if (body.commercial_name) {
+      db.prepare(`UPDATE mx_packings SET commercial_name=? WHERE packing_id=?`).run(body.commercial_name, body.packing_id);
+    }
     return { data: row, status: "applied" };
   });
 
@@ -161,6 +166,16 @@ export async function registerMxPackingRoutes(app: FastifyInstance, opts: { db: 
     db.prepare(
       `UPDATE mx_packings SET godown_id=?, location_hint=?, status='in_godown', updated_at=?, version=version+1 WHERE packing_id=?`,
     ).run(body.godown_id, body.location_hint ?? null, nowIso(), packing_id);
+    return { ok: true };
+  });
+
+  /** Set or update commercial name on a packing */
+  app.patch("/mx/packings/:packing_id/commercial-name", async (req, reply) => {
+    const { packing_id } = req.params as { packing_id: string };
+    const body = z.object({ commercial_name: z.string().trim().min(1) }).parse(req.body);
+    const p = db.prepare(`SELECT packing_id FROM mx_packings WHERE packing_id=? AND deleted_at IS NULL`).get(packing_id) as any;
+    if (!p) return reply.code(404).send({ error: "Not found" });
+    db.prepare(`UPDATE mx_packings SET commercial_name=?, updated_at=? WHERE packing_id=?`).run(body.commercial_name, nowIso(), packing_id);
     return { ok: true };
   });
 

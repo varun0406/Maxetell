@@ -82,13 +82,118 @@ export async function registerMxMastersRoutes(app: FastifyInstance, opts: { db: 
   // Job workers (mills)
   app.get("/mx/job-workers", async () => ({ data: db.prepare(`SELECT * FROM mx_job_workers WHERE deleted_at IS NULL ORDER BY name`).all() }));
   app.post("/mx/job-workers", async (req) => {
-    const body = z.object({ name: z.string().trim().min(1), contact: z.string().optional(), job_work_type: z.string().optional() }).parse(req.body);
-    const id = Number(db.prepare(`INSERT OR IGNORE INTO mx_job_workers(name, contact, job_work_type) VALUES (?,?,?)`).run(body.name, body.contact ?? null, body.job_work_type ?? null).lastInsertRowid);
+    const body = z.object({
+      name: z.string().trim().min(1),
+      contact: z.string().optional(),
+      job_work_type: z.string().optional(),
+      gstin: z.string().optional(),
+      address: z.string().optional(),
+      capacity_meters_per_day: z.number().optional(),
+      default_turnaround_days: z.number().int().optional(),
+    }).parse(req.body);
+    const id = Number(db.prepare(
+      `INSERT OR IGNORE INTO mx_job_workers(name, contact, job_work_type, gstin, address, capacity_meters_per_day, default_turnaround_days) VALUES (?,?,?,?,?,?,?)`,
+    ).run(body.name, body.contact ?? null, body.job_work_type ?? null, body.gstin ?? null, body.address ?? null, body.capacity_meters_per_day ?? null, body.default_turnaround_days ?? null).lastInsertRowid);
     return { data: { id, ...body } };
+  });
+  app.patch("/mx/job-workers/:id", async (req) => {
+    const id = Number((req.params as any).id);
+    const body = z.object({
+      name: z.string().trim().min(1),
+      contact: z.string().optional(),
+      job_work_type: z.string().optional(),
+      gstin: z.string().optional(),
+      address: z.string().optional(),
+      capacity_meters_per_day: z.number().optional(),
+      default_turnaround_days: z.number().int().optional(),
+    }).parse(req.body);
+    db.prepare(
+      `UPDATE mx_job_workers SET name=?, contact=?, job_work_type=?, gstin=?, address=?, capacity_meters_per_day=?, default_turnaround_days=?, updated_at=? WHERE id=?`,
+    ).run(body.name, body.contact ?? null, body.job_work_type ?? null, body.gstin ?? null, body.address ?? null, body.capacity_meters_per_day ?? null, body.default_turnaround_days ?? null, nowIso(), id);
+    return { ok: true };
   });
   app.delete("/mx/job-workers/:id", async (req) => {
     db.prepare(`UPDATE mx_job_workers SET deleted_at=?, updated_at=? WHERE id=?`).run(nowIso(), nowIso(), Number((req.params as any).id));
     return { ok: true };
+  });
+
+  /** Job Worker 360° Account Page — flagship entity-first endpoint */
+  app.get("/mx/job-workers/:id", async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const worker = db.prepare(`SELECT * FROM mx_job_workers WHERE id=? AND deleted_at IS NULL`).get(id) as any;
+    if (!worker) return reply.code(404).send({ error: "Job worker not found" });
+
+    // Tab 1 — "With Them Now": open jobs
+    const openJobs = db.prepare(`
+      SELECT j.*, r.short_code AS roll_short, COALESCE(r.lot_no, r.short_code) AS lot_display,
+             r.variant_code, v.variant_name, v.color, i.code AS item_code, i.name AS item_name,
+             CAST((julianday('now') - julianday(j.outward_date)) AS INTEGER) AS days_out,
+             pb.bill_no AS purchase_bill_no, s.name AS supplier_name
+      FROM mx_job_work j
+      JOIN mx_rolls r ON r.roll_id = j.roll_id
+      LEFT JOIN mx_item_variants v ON v.variant_code = r.variant_code
+      LEFT JOIN mx_items i ON i.id = v.item_id
+      LEFT JOIN mx_purchase_bills pb ON pb.id = r.purchase_bill_id
+      LEFT JOIN mx_suppliers s ON s.id = r.supplier_id
+      WHERE j.job_worker_id = ? AND j.deleted_at IS NULL AND j.processed_state = 'outward'
+      ORDER BY j.outward_date ASC
+    `).all(id);
+
+    const totalMetersOut = openJobs.reduce((s: number, j: any) => s + (j.meter_sent - (j.meter_returned ?? 0)), 0);
+
+    // Tab 2 — Capacity & Load
+    const capacityInfo = {
+      declared_capacity: worker.capacity_meters_per_day ?? null,
+      default_turnaround_days: worker.default_turnaround_days ?? null,
+      current_meters_out: totalMetersOut,
+      open_job_count: openJobs.length,
+      days_of_work_queued: worker.capacity_meters_per_day
+        ? Math.ceil(totalMetersOut / worker.capacity_meters_per_day)
+        : null,
+    };
+
+    // Tab 3 — History: all closed/returned jobs
+    const history = db.prepare(`
+      SELECT j.*, r.short_code AS roll_short, COALESCE(r.lot_no, r.short_code) AS lot_display,
+             r.variant_code, v.variant_name, v.color, i.name AS item_name,
+             CAST((julianday(COALESCE(j.inward_date, 'now')) - julianday(j.outward_date)) AS INTEGER) AS turnaround_days,
+             pb.bill_no AS purchase_bill_no, s.name AS supplier_name
+      FROM mx_job_work j
+      JOIN mx_rolls r ON r.roll_id = j.roll_id
+      LEFT JOIN mx_item_variants v ON v.variant_code = r.variant_code
+      LEFT JOIN mx_items i ON i.id = v.item_id
+      LEFT JOIN mx_purchase_bills pb ON pb.id = r.purchase_bill_id
+      LEFT JOIN mx_suppliers s ON s.id = r.supplier_id
+      WHERE j.job_worker_id = ? AND j.deleted_at IS NULL AND j.processed_state IN ('inward','closed')
+      ORDER BY j.inward_date DESC
+      LIMIT 200
+    `).all(id);
+
+    // Summary stats (trust indicators)
+    const stats = db.prepare(`
+      SELECT
+        COUNT(1) AS total_jobs,
+        AVG(CAST((julianday(COALESCE(j.inward_date, 'now')) - julianday(j.outward_date)) AS REAL)) AS avg_turnaround_days,
+        CASE WHEN SUM(j.meter_sent) > 0
+          THEN (SUM(COALESCE(j.shortage_meters, 0)) / SUM(j.meter_sent)) * 100
+          ELSE 0 END AS shortage_pct,
+        SUM(COALESCE(j.shortage_meters, 0)) AS total_shortage_m,
+        SUM(CASE WHEN j.quality_result = 'rejected' THEN 1 ELSE 0 END) AS rejected_count,
+        SUM(CASE WHEN j.quality_result = 'defect' THEN 1 ELSE 0 END) AS defect_count
+      FROM mx_job_work j
+      WHERE j.job_worker_id = ? AND j.deleted_at IS NULL AND j.processed_state IN ('inward','closed')
+    `).get(id);
+
+    return {
+      data: {
+        worker,
+        open_jobs: openJobs,
+        total_meters_out: totalMetersOut,
+        capacity: capacityInfo,
+        history,
+        stats,
+      },
+    };
   });
 
   // Godowns

@@ -5,6 +5,7 @@ export function migrate(db: Db) {
   migrateAppUsers(db);
   migrateMaxwellDomain(db);
   migratePartiesAgentsReporting(db);
+  migrateV2Entities(db);
   seedMaxwellDemo(db);
 }
 
@@ -364,4 +365,58 @@ function migrateLegacyTxIfEmpty(db: Db) {
   } catch {
     /* best-effort */
   }
+}
+
+/** BRD v2 — Purchase Bill, Alias Layer, entity enrichment */
+function migrateV2Entities(db: Db) {
+  // Purchase Bills
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mx_purchase_bills (
+      id             INTEGER PRIMARY KEY,
+      bill_no        TEXT NOT NULL,
+      supplier_id    INTEGER NOT NULL REFERENCES mx_suppliers(id),
+      bill_date      TEXT NOT NULL,
+      total_meterage REAL,
+      total_amount   REAL,
+      notes          TEXT,
+      deleted_at     TEXT,
+      updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS mx_aliases (
+      id          INTEGER PRIMARY KEY,
+      entity_type TEXT NOT NULL CHECK(entity_type IN ('roll','packing','parcel')),
+      entity_id   TEXT NOT NULL,
+      alias_type  TEXT NOT NULL CHECK(alias_type IN ('supplier_name','job_work_ref','commercial_name','lot_no','custom')),
+      alias_value TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_mx_aliases_value ON mx_aliases(LOWER(alias_value));
+    CREATE INDEX IF NOT EXISTS idx_mx_aliases_entity ON mx_aliases(entity_type, entity_id);
+  `);
+
+  // Roll → Purchase Bill link
+  ensureColumn(db, "mx_rolls", "purchase_bill_id", "INTEGER REFERENCES mx_purchase_bills(id)");
+
+  // Packing commercial name
+  ensureColumn(db, "mx_packings", "commercial_name", "TEXT");
+
+  // Job Work enrichment — quality + ref
+  ensureColumn(db, "mx_job_work", "quality_result", "TEXT");
+  ensureColumn(db, "mx_job_work", "quality_notes", "TEXT");
+  ensureColumn(db, "mx_job_work", "job_work_ref", "TEXT");
+
+  // Job Worker enrichment — capacity, turnaround, GSTIN, address
+  ensureColumn(db, "mx_job_workers", "gstin", "TEXT");
+  ensureColumn(db, "mx_job_workers", "address", "TEXT");
+  ensureColumn(db, "mx_job_workers", "capacity_meters_per_day", "REAL");
+  ensureColumn(db, "mx_job_workers", "default_turnaround_days", "INTEGER");
+
+  // Supplier enrichment — GSTIN, address, state, payment terms
+  ensureColumn(db, "mx_suppliers", "gstin", "TEXT");
+  ensureColumn(db, "mx_suppliers", "address", "TEXT");
+  ensureColumn(db, "mx_suppliers", "state", "TEXT");
+  ensureColumn(db, "mx_suppliers", "payment_terms", "TEXT");
 }
