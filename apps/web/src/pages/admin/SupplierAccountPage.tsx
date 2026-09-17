@@ -109,23 +109,21 @@ export function SupplierAccountPage() {
             <TableHead>
               <TableRow sx={{ bgcolor: "grey.50" }}>
                 <TableCell>Date</TableCell>
-                <TableCell>Bill Ref</TableCell>
-                <TableCell>Rolls Expected</TableCell>
-                <TableCell>Meters Expected</TableCell>
-                <TableCell>Received</TableCell>
+                <TableCell>Bill No</TableCell>
+                <TableCell align="right">Total Meters</TableCell>
+                <TableCell align="right">Amount</TableCell>
                 <TableCell>Status</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {(supplier.active_pos || []).map((b: any) => (
-                <TableRow key={b.purchase_bill_id}>
-                  <TableCell>{b.bill_date}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{b.supplier_bill_no || "—"}</TableCell>
-                  <TableCell>{b.rolls_expected || 0}</TableCell>
-                  <TableCell>{b.meters_expected || 0}</TableCell>
-                  <TableCell>{b.rolls_received || 0}</TableCell>
+                <TableRow key={b.id}>
+                  <TableCell>{new Date(b.bill_date).toLocaleDateString()}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{b.bill_no || "—"}</TableCell>
+                  <TableCell align="right">{b.total_meterage ? b.total_meterage.toLocaleString() : "—"}</TableCell>
+                  <TableCell align="right">{b.total_amount ? `₹${b.total_amount.toLocaleString()}` : "—"}</TableCell>
                   <TableCell>
-                    <Chip size="small" label={b.status} color={b.status === "open" ? "warning" : "success"} />
+                    <Chip size="small" label="Logged" color="success" />
                   </TableCell>
                 </TableRow>
               ))}
