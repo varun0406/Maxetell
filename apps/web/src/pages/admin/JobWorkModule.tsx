@@ -91,7 +91,7 @@ export function JobWorkModule() {
           </Typography>
           
           <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
+            <Grid  size={{ xs: 12, md: 4 }}>
               <TextField 
                 select fullWidth label="Select Lot / Roll" 
                 value={outForm.roll_id} 
@@ -105,7 +105,7 @@ export function JobWorkModule() {
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid  size={{ xs: 12, md: 4 }}>
               <TextField 
                 select fullWidth label="Job Worker" 
                 value={outForm.job_worker_id} 
@@ -117,14 +117,14 @@ export function JobWorkModule() {
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={6} md={2}>
+            <Grid  size={{ xs: 12, sm: 6, md: 2 }}>
               <TextField 
                 fullWidth type="number" label="Meters Sent" 
                 value={outForm.meter_sent || ""} 
                 onChange={(e) => setOutForm({ ...outForm, meter_sent: Number(e.target.value) })} 
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={2}>
+            <Grid  size={{ xs: 12, sm: 6, md: 2 }}>
               <Button
                 variant="contained" fullWidth sx={{ height: 56, background: "linear-gradient(135deg, #a855f7, #ec4899)" }}
                 onClick={async () => {
@@ -145,7 +145,7 @@ export function JobWorkModule() {
       <TabPanel value={tab} index={1}>
         <Grid container spacing={2}>
           {openJobs.map((j, idx) => (
-            <Grid item xs={12} key={j.job_work_id}>
+            <Grid key={j.job_work_id} size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 3, display: "flex", alignItems: "center", gap: 3, borderRadius: 3 }} className={`stagger-${(idx % 5) + 1}`}>
                 <Box sx={{ width: 48, height: 48, borderRadius: 2, background: "rgba(168, 85, 247, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <ContentCutIcon sx={{ color: "#a855f7" }} />
@@ -193,7 +193,7 @@ export function JobWorkModule() {
             </Grid>
           ))}
           {!openJobs.length && (
-            <Grid item xs={12}>
+            <Grid  size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
                 <Typography color="text.secondary">No open job-work pending return.</Typography>
               </Paper>
@@ -234,7 +234,7 @@ export function JobWorkModule() {
 
         <Grid container spacing={3}>
           {workers.map((w, idx) => (
-            <Grid item xs={12} sm={6} md={4} key={w.id}>
+            <Grid key={w.id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
                 <Typography variant="h6" fontWeight={800}>{w.name}</Typography>
                 <Stack direction="row" spacing={1} mt={2}>
@@ -245,7 +245,7 @@ export function JobWorkModule() {
             </Grid>
           ))}
           {!workers.length && (
-            <Grid item xs={12}>
+            <Grid  size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
                 <Typography color="text.secondary">No job workers added yet.</Typography>
               </Paper>

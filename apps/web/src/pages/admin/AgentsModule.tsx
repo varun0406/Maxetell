@@ -72,7 +72,7 @@ export function AgentsModule() {
 
       <Grid container spacing={3}>
         {agents.map((a, idx) => (
-          <Grid item xs={12} sm={6} md={4} key={a.id}>
+          <Grid key={a.id} size={{ xs: 12, sm: 6, md: 4 }}>
             <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
               <Typography variant="h6" fontWeight={800}>{a.name}</Typography>
               <Typography variant="body2" color="text.secondary" mt={1}>
@@ -87,7 +87,7 @@ export function AgentsModule() {
           </Grid>
         ))}
         {!agents.length && (
-          <Grid item xs={12}>
+          <Grid  size={{ xs: 12 }}>
             <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
               <Typography color="text.secondary">No agents added yet.</Typography>
             </Paper>

@@ -125,7 +125,7 @@ export function ItemCatalogPage() {
 
         <Grid container spacing={3} mb={4}>
           {variants.map((v: any, idx: number) => (
-            <Grid key={v.variant_code} item xs={12} md={6}>
+            <Grid key={v.variant_code} size={{ xs: 12, md: 6 }}>
               <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
                 <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
                   <Box>
@@ -140,18 +140,18 @@ export function ItemCatalogPage() {
                   <Chip size="small" label={`${v.roll_count || 0} lots`} />
                 </Stack>
                 <Grid container spacing={1}>
-                  <Grid item xs={4}><Metric label="Available" value={`${Number(v.available_m || 0).toFixed(0)} m`} accent="success.main" /></Grid>
-                  <Grid item xs={4}><Metric label="On lots" value={`${Number(v.roll_remaining_m || 0).toFixed(0)} m`} /></Grid>
-                  <Grid item xs={4}><Metric label="At mill" value={`${Number(v.mill_wip_m || 0).toFixed(0)} m`} accent="warning.main" /></Grid>
-                  <Grid item xs={4}><Metric label="Godown" value={`${Number(v.godown_m || 0).toFixed(0)} m`} /></Grid>
-                  <Grid item xs={4}><Metric label="Packed" value={`${Number(v.packed_m || 0).toFixed(0)} m`} /></Grid>
-                  <Grid item xs={4}><Metric label="Dispatched" value={`${Number(v.dispatched_m || 0).toFixed(0)} m`} /></Grid>
+                  <Grid  size={{ xs: 4 }}><Metric label="Available" value={`${Number(v.available_m || 0).toFixed(0)} m`} accent="success.main" /></Grid>
+                  <Grid  size={{ xs: 4 }}><Metric label="On lots" value={`${Number(v.roll_remaining_m || 0).toFixed(0)} m`} /></Grid>
+                  <Grid  size={{ xs: 4 }}><Metric label="At mill" value={`${Number(v.mill_wip_m || 0).toFixed(0)} m`} accent="warning.main" /></Grid>
+                  <Grid  size={{ xs: 4 }}><Metric label="Godown" value={`${Number(v.godown_m || 0).toFixed(0)} m`} /></Grid>
+                  <Grid  size={{ xs: 4 }}><Metric label="Packed" value={`${Number(v.packed_m || 0).toFixed(0)} m`} /></Grid>
+                  <Grid  size={{ xs: 4 }}><Metric label="Dispatched" value={`${Number(v.dispatched_m || 0).toFixed(0)} m`} /></Grid>
                 </Grid>
               </Paper>
             </Grid>
           ))}
           {!variants.length && (
-            <Grid item xs={12}>
+            <Grid  size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
                 <Typography color="text.secondary">No variants for this item. Add the first color/shade above.</Typography>
               </Paper>
@@ -247,7 +247,7 @@ export function ItemCatalogPage() {
 
       <Grid container spacing={3}>
         {items.map((it, idx) => (
-          <Grid key={it.id} item xs={12} sm={6} lg={4}>
+          <Grid key={it.id} size={{ xs: 12, sm: 6, lg: 4 }}>
             <Paper
               elevation={0}
               onClick={() => void openItem(it.id)}
@@ -276,7 +276,7 @@ export function ItemCatalogPage() {
           </Grid>
         ))}
         {!items.length && (
-          <Grid item xs={12}>
+          <Grid  size={{ xs: 12 }}>
             <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
               <Typography color="text.secondary">No items yet. Create your first item.</Typography>
             </Paper>

@@ -104,19 +104,19 @@ export function PartiesModule() {
           {showNewAddress && (
             <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 3, border: "1px solid rgba(16, 185, 129, 0.2)" }} className="animate-slide-down">
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid  size={{ xs: 12, sm: 6, md: 3 }}>
                   <TextField fullWidth size="small" label="Label (e.g. Factory)" value={shipForm.label} onChange={(e) => setShipForm({ ...shipForm, label: e.target.value })} />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid  size={{ xs: 12, sm: 6, md: 3 }}>
                   <TextField fullWidth size="small" label="Address" value={shipForm.address_line} onChange={(e) => setShipForm({ ...shipForm, address_line: e.target.value })} />
                 </Grid>
-                <Grid item xs={12} sm={6} md={2}>
+                <Grid  size={{ xs: 12, sm: 6, md: 2 }}>
                   <TextField fullWidth size="small" label="City" value={shipForm.city} onChange={(e) => setShipForm({ ...shipForm, city: e.target.value })} />
                 </Grid>
-                <Grid item xs={12} sm={6} md={2}>
+                <Grid  size={{ xs: 12, sm: 6, md: 2 }}>
                   <TextField fullWidth size="small" label="Phone" value={shipForm.phone} onChange={(e) => setShipForm({ ...shipForm, phone: e.target.value })} />
                 </Grid>
-                <Grid item xs={12} md={2}>
+                <Grid  size={{ xs: 12, md: 2 }}>
                   <Button
                     variant="contained" color="success" fullWidth sx={{ height: 40 }}
                     onClick={async () => {
@@ -139,7 +139,7 @@ export function PartiesModule() {
 
           <Grid container spacing={3}>
             {partyAddresses.map((a, idx) => (
-              <Grid item xs={12} sm={6} md={4} key={a.id}>
+              <Grid key={a.id} size={{ xs: 12, sm: 6, md: 4 }}>
                 <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
                   <Typography fontWeight={800}>{a.label || "Deliver to"}</Typography>
                   <Typography variant="body2" color="text.secondary" mt={0.5}>{a.address_line || "—"}</Typography>
@@ -149,7 +149,7 @@ export function PartiesModule() {
               </Grid>
             ))}
             {!partyAddresses.length && (
-              <Grid item xs={12}>
+              <Grid  size={{ xs: 12 }}>
                 <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
                   <Typography color="text.secondary">No ship-to addresses yet. Add one above.</Typography>
                 </Paper>
@@ -185,13 +185,13 @@ export function PartiesModule() {
               <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 3, border: "1px solid rgba(16, 185, 129, 0.2)", background: "rgba(16, 185, 129, 0.02)" }} className="animate-slide-down">
                 <Typography fontWeight={700} mb={2}>Onboard New Party</Typography>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={4}><TextField fullWidth size="small" label="Party name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Grid>
-                  <Grid item xs={12} sm={6} md={4}><TextField fullWidth size="small" label="GSTIN" value={form.gstin} onChange={(e) => setForm({ ...form, gstin: e.target.value })} /></Grid>
-                  <Grid item xs={12} sm={6} md={4}><TextField fullWidth size="small" label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Grid>
-                  <Grid item xs={12} sm={6} md={4}><TextField fullWidth size="small" label="Address" value={form.address_line} onChange={(e) => setForm({ ...form, address_line: e.target.value })} /></Grid>
-                  <Grid item xs={12} sm={6} md={3}><TextField fullWidth size="small" label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Grid>
-                  <Grid item xs={12} sm={6} md={3}><TextField fullWidth size="small" label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} /></Grid>
-                  <Grid item xs={12} md={2}>
+                  <Grid  size={{ xs: 12, sm: 6, md: 4 }}><TextField fullWidth size="small" label="Party name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Grid>
+                  <Grid  size={{ xs: 12, sm: 6, md: 4 }}><TextField fullWidth size="small" label="GSTIN" value={form.gstin} onChange={(e) => setForm({ ...form, gstin: e.target.value })} /></Grid>
+                  <Grid  size={{ xs: 12, sm: 6, md: 4 }}><TextField fullWidth size="small" label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Grid>
+                  <Grid  size={{ xs: 12, sm: 6, md: 4 }}><TextField fullWidth size="small" label="Address" value={form.address_line} onChange={(e) => setForm({ ...form, address_line: e.target.value })} /></Grid>
+                  <Grid  size={{ xs: 12, sm: 6, md: 3 }}><TextField fullWidth size="small" label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Grid>
+                  <Grid  size={{ xs: 12, sm: 6, md: 3 }}><TextField fullWidth size="small" label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} /></Grid>
+                  <Grid  size={{ xs: 12, md: 2 }}>
                     <Button
                       variant="contained" color="success" fullWidth sx={{ height: 40 }}
                       onClick={async () => {
@@ -213,7 +213,7 @@ export function PartiesModule() {
               {parties.map((p, idx) => {
                 const n = addresses.filter((a) => a.party_id === p.id).length;
                 return (
-                  <Grid item xs={12} sm={6} md={4} key={p.id}>
+                  <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
                     <Paper 
                       elevation={0} 
                       onClick={() => setOpenId(p.id)} 
@@ -235,7 +235,7 @@ export function PartiesModule() {
                 );
               })}
               {!parties.length && (
-                <Grid item xs={12}>
+                <Grid  size={{ xs: 12 }}>
                   <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
                     <Typography color="text.secondary">No parties yet.</Typography>
                   </Paper>
@@ -255,7 +255,7 @@ export function PartiesModule() {
             {showNewAddress && (
               <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 3, border: "1px solid rgba(14, 165, 233, 0.2)" }} className="animate-slide-down">
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid  size={{ xs: 12, sm: 6, md: 3 }}>
                     <TextField
                       select fullWidth size="small" label="Link to Party"
                       value={shipForm.party_id}
@@ -269,19 +269,19 @@ export function PartiesModule() {
                       {parties.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
                     </TextField>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid  size={{ xs: 12, sm: 6, md: 3 }}>
                     <TextField fullWidth size="small" label="Label / name" value={shipForm.party_name} onChange={(e) => setShipForm({ ...shipForm, party_name: e.target.value })} />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={2}>
+                  <Grid  size={{ xs: 12, sm: 6, md: 2 }}>
                     <TextField fullWidth size="small" label="Address" value={shipForm.address_line} onChange={(e) => setShipForm({ ...shipForm, address_line: e.target.value })} />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={2}>
+                  <Grid  size={{ xs: 12, sm: 6, md: 2 }}>
                     <TextField fullWidth size="small" label="City" value={shipForm.city} onChange={(e) => setShipForm({ ...shipForm, city: e.target.value })} />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={2}>
+                  <Grid  size={{ xs: 12, sm: 6, md: 2 }}>
                     <TextField fullWidth size="small" label="Phone" value={shipForm.phone} onChange={(e) => setShipForm({ ...shipForm, phone: e.target.value })} />
                   </Grid>
-                  <Grid item xs={12}>
+                  <Grid  size={{ xs: 12 }}>
                     <Button
                       variant="contained" color="info"
                       onClick={async () => {
@@ -300,7 +300,7 @@ export function PartiesModule() {
 
             <Grid container spacing={3}>
               {addresses.map((a, idx) => (
-                <Grid item xs={12} sm={6} md={4} key={a.id}>
+                <Grid key={a.id} size={{ xs: 12, sm: 6, md: 4 }}>
                   <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
                     <Typography fontWeight={800}>{a.party_name}</Typography>
                     <Typography variant="body2" color="text.secondary" mt={0.5}>{a.address_line || "—"}</Typography>

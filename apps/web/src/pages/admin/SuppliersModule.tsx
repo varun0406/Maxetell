@@ -92,7 +92,7 @@ export function SuppliersModule() {
           </Typography>
           
           <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
+            <Grid  size={{ xs: 12, md: 4 }}>
               <TextField 
                 select fullWidth label="Supplier" 
                 value={rollForm.supplier_id} 
@@ -104,7 +104,7 @@ export function SuppliersModule() {
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid  size={{ xs: 12, md: 4 }}>
               <TextField 
                 fullWidth label="Lot No (from Supplier)" required
                 value={rollForm.lot_no} 
@@ -112,7 +112,7 @@ export function SuppliersModule() {
                 placeholder="e.g. SF-2401-A"
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid  size={{ xs: 12, md: 4 }}>
               <TextField 
                 select fullWidth label="Item Variant" 
                 value={rollForm.variant_code} 
@@ -126,21 +126,21 @@ export function SuppliersModule() {
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid  size={{ xs: 12, sm: 6, md: 4 }}>
               <TextField 
                 fullWidth type="number" label="Meters" 
                 value={rollForm.original_meterage} 
                 onChange={(e) => setRollForm({ ...rollForm, original_meterage: Number(e.target.value) })} 
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid  size={{ xs: 12, sm: 6, md: 4 }}>
               <TextField 
                 fullWidth type="date" label="Received Date" InputLabelProps={{ shrink: true }} 
                 value={rollForm.received_date} 
                 onChange={(e) => setRollForm({ ...rollForm, received_date: e.target.value })} 
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid  size={{ xs: 12, md: 4 }}>
               <Button
                 variant="contained" fullWidth sx={{ height: 56, background: "linear-gradient(135deg, #0ea5e9, #6366f1)" }}
                 onClick={async () => {
@@ -190,7 +190,7 @@ export function SuppliersModule() {
 
         <Grid container spacing={3}>
           {suppliers.map((s, idx) => (
-            <Grid item xs={12} sm={6} md={4} key={s.id}>
+            <Grid key={s.id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
                 <Typography variant="h6" fontWeight={800}>{s.name}</Typography>
                 <Typography variant="body2" color="text.secondary" mt={1}>
@@ -200,7 +200,7 @@ export function SuppliersModule() {
             </Grid>
           ))}
           {!suppliers.length && (
-            <Grid item xs={12}>
+            <Grid  size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
                 <Typography color="text.secondary">No suppliers yet.</Typography>
               </Paper>
@@ -212,7 +212,7 @@ export function SuppliersModule() {
       <TabPanel value={tab} index={2}>
         <Grid container spacing={2}>
           {rolls.map((r, idx) => (
-            <Grid item xs={12} key={r.roll_id}>
+            <Grid key={r.roll_id} size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 2, display: "flex", alignItems: "center", gap: 3, borderRadius: 3 }} className={`stagger-${(idx % 5) + 1}`}>
                 <Box sx={{ width: 48, height: 48, borderRadius: 2, background: "rgba(14, 165, 233, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <InventoryIcon sx={{ color: "#0ea5e9" }} />
@@ -238,7 +238,7 @@ export function SuppliersModule() {
             </Grid>
           ))}
           {!rolls.length && (
-            <Grid item xs={12}>
+            <Grid  size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
                 <Typography color="text.secondary">No lots received yet.</Typography>
               </Paper>

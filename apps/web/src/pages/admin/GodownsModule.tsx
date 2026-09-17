@@ -73,7 +73,7 @@ export function GodownsModule() {
 
       <Grid container spacing={3}>
         {godowns.map((g, idx) => (
-          <Grid item xs={12} sm={6} md={4} key={g.id}>
+          <Grid key={g.id} size={{ xs: 12, sm: 6, md: 4 }}>
             <Paper elevation={0} sx={{ p: 3, height: "100%", borderRadius: 4 }} className={`stagger-${(idx % 5) + 1}`}>
               <Typography variant="overline" color="primary" fontWeight={800} sx={{ color: "#64748b" }}>
                 {g.code}
@@ -86,7 +86,7 @@ export function GodownsModule() {
           </Grid>
         ))}
         {!godowns.length && (
-          <Grid item xs={12}>
+          <Grid  size={{ xs: 12 }}>
             <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
               <Typography color="text.secondary">No godowns added yet.</Typography>
             </Paper>
