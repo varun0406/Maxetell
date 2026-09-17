@@ -43,11 +43,7 @@ export function JobWorkModule() {
     meter_sent: 0,
     outward_date: new Date().toISOString().slice(0, 10)
   });
-  const [meters, setMeters] = useState<Record<string, number>>({});
-  const [searchJobs, setSearchJobs] = useState("");
   const [searchWorkers, setSearchWorkers] = useState("");
-  const [qualityResults, setQualityResults] = useState<Record<string, string>>({});
-  const [isFinals, setIsFinals] = useState<Record<string, boolean>>({});
   
   // Bulk Receive State
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
@@ -177,7 +173,6 @@ export function JobWorkModule() {
         <Typography variant="h6" mt={4} mb={2}>Pending Individual Rolls</Typography>
         <Grid container spacing={2}>
           {openJobs
-            .filter((j) => j.roll_short?.toLowerCase().includes(searchJobs.toLowerCase()) || j.worker_name?.toLowerCase().includes(searchJobs.toLowerCase()))
             .map((j, idx) => (
             <Grid key={j.job_work_id} size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 3, display: "flex", alignItems: "center", gap: 3, borderRadius: 3 }} className={`stagger-${(idx % 5) + 1}`}>
