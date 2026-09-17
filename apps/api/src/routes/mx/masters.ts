@@ -69,6 +69,28 @@ export async function registerMxMastersRoutes(app: FastifyInstance, opts: { db: 
 
   // Suppliers
   app.get("/mx/suppliers", async () => ({ data: db.prepare(`SELECT * FROM mx_suppliers WHERE deleted_at IS NULL ORDER BY name`).all() }));
+  
+  app.get("/mx/suppliers/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const supplier = db.prepare(`SELECT * FROM mx_suppliers WHERE id=? AND deleted_at IS NULL`).get(id) as any;
+    if (!supplier) return reply.code(404).send({ error: "Not found" });
+
+    // Active purchase bills (unbilled or partially received)
+    const active_pos = db.prepare(`SELECT * FROM mx_purchase_bills WHERE supplier_id=? AND deleted_at IS NULL ORDER BY bill_date DESC`).all(id);
+    
+    // Recent rolls supplied
+    const recent_rolls = db.prepare(`
+      SELECT r.short_code, r.lot_no, r.original_meters, r.created_at, i.name as item_name, v.variant_code
+      FROM mx_rolls r
+      LEFT JOIN mx_items i ON i.id = r.item_id
+      LEFT JOIN mx_item_variants v ON v.id = r.variant_id
+      WHERE r.supplier_id=? AND r.deleted_at IS NULL
+      ORDER BY r.created_at DESC LIMIT 50
+    `).all(id);
+
+    return { data: { ...supplier, active_pos, recent_rolls } };
+  });
+
   app.post("/mx/suppliers", async (req) => {
     const body = z.object({ name: z.string().trim().min(1), contact: z.string().optional() }).parse(req.body);
     const id = Number(db.prepare(`INSERT OR IGNORE INTO mx_suppliers(name, contact) VALUES (?,?)`).run(body.name, body.contact ?? null).lastInsertRowid);
@@ -212,6 +234,27 @@ export async function registerMxMastersRoutes(app: FastifyInstance, opts: { db: 
   app.get("/mx/parties", async () => ({
     data: db.prepare(`SELECT * FROM mx_parties WHERE deleted_at IS NULL ORDER BY name`).all(),
   }));
+
+  app.get("/mx/parties/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const party = db.prepare(`SELECT * FROM mx_parties WHERE id=? AND deleted_at IS NULL`).get(id) as any;
+    if (!party) return reply.code(404).send({ error: "Not found" });
+
+    // Delivery addresses
+    const addresses = db.prepare(`SELECT * FROM mx_delivery_addresses WHERE party_id=? AND deleted_at IS NULL`).all(id);
+
+    // Live / Recent Challans
+    const challans = db.prepare(`
+      SELECT challan_id, challan_no, challan_date, status, (SELECT COUNT(1) FROM mx_challan_scans WHERE challan_id=c.challan_id AND deleted_at IS NULL) as scan_count,
+      (SELECT SUM(required_meters) FROM mx_challan_requirements r WHERE r.challan_id=c.challan_id) AS total_required_meters
+      FROM mx_challans c
+      WHERE party_id=? AND deleted_at IS NULL
+      ORDER BY challan_date DESC, created_at DESC LIMIT 20
+    `).all(id);
+
+    return { data: { ...party, addresses, challans } };
+  });
+
   app.post("/mx/parties", async (req, reply) => {
     const body = z
       .object({

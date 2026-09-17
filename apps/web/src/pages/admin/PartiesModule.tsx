@@ -19,6 +19,7 @@ import StorefrontIcon from "@mui/icons-material/Storefront";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { api } from "../../lib/api";
+import { useNavigate } from "react-router-dom";
 
 function TabPanel({ value, index, children }: { value: number; index: number; children: React.ReactNode }) {
   if (value !== index) return null;
@@ -27,6 +28,7 @@ function TabPanel({ value, index, children }: { value: number; index: number; ch
 
 export function PartiesModule() {
   const [tab, setTab] = useState(0);
+  const navigate = useNavigate();
   const [parties, setParties] = useState<any[]>([]);
   const [addresses, setAddresses] = useState<any[]>([]);
   
@@ -224,7 +226,7 @@ export function PartiesModule() {
                   <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
                     <Paper 
                       elevation={0} 
-                      onClick={() => setOpenId(p.id)} 
+                      onClick={() => navigate(`/parties/account/${p.id}`)} 
                       sx={{ p: 3, height: "100%", borderRadius: 4, cursor: "pointer", transition: "all 0.2s", "&:hover": { borderColor: "success.main", transform: "translateY(-4px)" } }} 
                       className={`stagger-${(idx % 5) + 1}`}
                     >

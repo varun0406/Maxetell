@@ -153,6 +153,8 @@ export function FloorChallanPage() {
   const [scan, setScan] = useState("");
   const [scanType, setScanType] = useState<"packing" | "parcel">("packing");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [flash, setFlash] = useState<"success" | "warning" | "error" | null>(null);
+  const [transporterData, setTransporterData] = useState({ vehicle_no: "", transporter_name: "" });
 
   async function loadList() {
     const r = await api.get("/mx/challans");
@@ -194,20 +196,35 @@ export function FloorChallanPage() {
         scanned_at: new Date().toISOString(),
       });
       setMsg({ ok: true, text: `Scanned ${scan.trim()}` });
+      setFlash("success");
       setScan("");
       await openChallan(active.challan_id);
     } catch (e: any) {
       playAlert();
+      setFlash("error");
       setMsg({ ok: false, text: e?.response?.data?.error ?? "Scan rejected" });
+    }
+    setTimeout(() => setFlash(null), 800);
+  }
+
+  async function undoScan(scanId: string) {
+    if (!active) return;
+    try {
+      await api.delete(`/mx/challans/${active.challan_id}/scan/${scanId}`);
+      setMsg({ ok: true, text: "Scan removed" });
+      await openChallan(active.challan_id);
+    } catch {
+      setMsg({ ok: false, text: "Failed to remove scan" });
     }
   }
 
   async function dispatch() {
     if (!active) return;
     try {
-      await api.post(`/mx/challans/${active.challan_id}/dispatch`);
+      await api.post(`/mx/challans/${active.challan_id}/dispatch`, transporterData);
       setMsg({ ok: true, text: "Dispatched" });
       setActive(null);
+      setTransporterData({ vehicle_no: "", transporter_name: "" });
       await loadList();
     } catch (e: any) {
       playAlert();
@@ -217,6 +234,11 @@ export function FloorChallanPage() {
 
   const reqs: any[] = active?.requirements ?? [];
   const scans: any[] = active?.scans ?? [];
+  const pick_list: any[] = active?.pick_list ?? [];
+
+  const totalReqMeters = reqs.reduce((sum, r) => sum + r.required_meters, 0);
+  const totalScannedMeters = scans.reduce((sum, s) => sum + (s.scan_type === "packing" ? 100 : 0) /* placeholder, ideally backend sends this */, 0);
+
 
   if (!active) {
     return (
@@ -241,7 +263,13 @@ export function FloorChallanPage() {
   }
 
   return (
-    <div>
+    <div style={{
+      transition: "background-color 0.3s",
+      backgroundColor: flash === "success" ? "#dcfce7" : flash === "error" ? "#fee2e2" : flash === "warning" ? "#fef3c7" : "transparent",
+      padding: flash ? "16px" : 0,
+      margin: flash ? "-16px" : 0,
+      borderRadius: flash ? 8 : 0,
+    }}>
       {msg && <div className={`floor-toast ${msg.ok ? "ok" : "err"}`}>{msg.text}</div>}
       <button type="button" className="floor-btn ghost" onClick={() => setActive(null)}>
         ← Back to list
@@ -269,13 +297,25 @@ export function FloorChallanPage() {
         )}
       </div>
 
-      {(active.location_hints ?? []).length > 0 && (
+      {pick_list.length > 0 && (
         <>
-          <div className="floor-label">Where to find</div>
+          <div className="floor-label">Pick List (Walking Order)</div>
           <div className="floor-card">
-            {(active.location_hints ?? []).slice(0, 8).map((h: any) => (
-              <div key={h.packing_id} style={{ marginBottom: 6, fontSize: 14 }}>
-                <strong>{h.variant_code}</strong> · {h.short_code} → {h.godown_name ?? "?"} {h.location_hint ?? ""}
+            {pick_list.map((godown: any) => (
+              <div key={godown.godown} style={{ marginBottom: 12 }}>
+                <div style={{ fontWeight: 800, color: "var(--mx-primary)", marginBottom: 4 }}>
+                  {godown.godown}
+                </div>
+                {godown.racks.map((rack: any) => (
+                  <div key={rack.rack} style={{ marginLeft: 8, marginBottom: 8 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>Rack: {rack.rack}</div>
+                    {rack.packings.map((p: any) => (
+                      <div key={p.packing_id} style={{ marginLeft: 8, fontSize: 13, color: "var(--mx-text)" }}>
+                        <strong className="floor-mono">{p.short_code}</strong> · {p.variant_code} ({p.length_meters}m)
+                      </div>
+                    ))}
+                  </div>
+                ))}
               </div>
             ))}
           </div>
@@ -301,12 +341,31 @@ export function FloorChallanPage() {
 
       <div className="floor-label">Scanned ({scans.length})</div>
       {scans.map((s) => (
-        <div key={s.scan_id} className="floor-list-item">
+        <div key={s.scan_id} className="floor-list-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span className="floor-mono">
             {s.scan_type}: {String(s.scanned_ref).slice(0, 16)}
           </span>
+          <button type="button" onClick={() => undoScan(s.scan_id)} style={{ background: "none", border: "none", color: "var(--mx-error)", fontSize: 18, cursor: "pointer", padding: "0 8px" }}>
+            ✕
+          </button>
         </div>
       ))}
+
+      <div className="floor-label" style={{ marginTop: 24 }}>Transport Details</div>
+      <input
+        className="floor-input"
+        placeholder="Vehicle Number"
+        value={transporterData.vehicle_no}
+        onChange={(e) => setTransporterData({ ...transporterData, vehicle_no: e.target.value })}
+        style={{ marginBottom: 8 }}
+      />
+      <input
+        className="floor-input"
+        placeholder="Transporter Name"
+        value={transporterData.transporter_name}
+        onChange={(e) => setTransporterData({ ...transporterData, transporter_name: e.target.value })}
+        style={{ marginBottom: 16 }}
+      />
 
       <button type="button" className="floor-btn" style={{ marginTop: 12 }} onClick={() => void dispatch()}>
         Dispatch challan

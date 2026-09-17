@@ -42,6 +42,7 @@ const nav = [
   { to: "/agents", label: "Agents", icon: <SupportAgentIcon /> },
   { to: "/godowns", label: "Godowns", icon: <WarehouseIcon /> },
   { to: "/coordinator", label: "Coordinator Board", icon: <PrecisionManufacturingIcon /> },
+  { to: "/dispatcher", label: "Dispatcher Board", icon: <LocalShippingIcon /> },
   { to: "/challans", label: "Delivery Challans", icon: <ArticleOutlinedIcon /> },
   { to: "/challans/new", label: "New Challan", icon: <ArticleOutlinedIcon /> },
   { to: "/floor/cutting", label: "Floor App", icon: <ContentCutOutlinedIcon />, highlight: true },

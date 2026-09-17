@@ -94,13 +94,14 @@ export async function registerMxChallanRoutes(app: FastifyInstance, opts: { db: 
   const { db } = opts;
 
   app.get("/mx/challans", async (req) => {
-    const { status } = req.query as { status?: string };
+    const { status, date } = req.query as { status?: string; date?: string };
     let sql = `
       SELECT c.*,
         a.party_name AS addr_party, a.city AS ship_city,
         p.name AS party_master_name, p.gstin AS party_gstin,
         COALESCE(ag.name, c.agent_name) AS agent_display,
-        (SELECT COUNT(1) FROM mx_challan_scans s WHERE s.challan_id=c.challan_id AND s.deleted_at IS NULL) AS scan_count
+        (SELECT COUNT(1) FROM mx_challan_scans s WHERE s.challan_id=c.challan_id AND s.deleted_at IS NULL) AS scan_count,
+        (SELECT SUM(required_meters) FROM mx_challan_requirements r WHERE r.challan_id=c.challan_id) AS total_required_meters
       FROM mx_challans c
       LEFT JOIN mx_delivery_addresses a ON a.id = c.address_id
       LEFT JOIN mx_parties p ON p.id = c.party_id
@@ -112,8 +113,35 @@ export async function registerMxChallanRoutes(app: FastifyInstance, opts: { db: 
       sql += ` AND c.status = ?`;
       params.push(status);
     }
+    if (date) {
+      // date filter like "2026-09-17"
+      if (date === "today") {
+        sql += ` AND date(c.challan_date) = date('now', 'localtime')`;
+      } else {
+        sql += ` AND date(c.challan_date) = ?`;
+        params.push(date);
+      }
+    }
     sql += ` ORDER BY c.challan_date DESC, c.created_at DESC`;
-    return { data: db.prepare(sql).all(...params) };
+    
+    const rows = db.prepare(sql).all(...params) as any[];
+    
+    // For progress bar: Calculate assembled meters for each challan
+    for (const r of rows) {
+      r.assembled_meters = 0;
+      if (r.scan_count > 0) {
+        // Compute assembled meters by looking at packings and parcels scanned
+        const assembled = db.prepare(`
+          SELECT 
+            SUM(CASE WHEN s.scan_type = 'packing' THEN pk.length_meters ELSE (SELECT SUM(pk2.length_meters) FROM mx_parcel_items pi JOIN mx_packings pk2 ON pk2.packing_id = pi.packing_id WHERE pi.parcel_id = s.scanned_ref) END) as total
+          FROM mx_challan_scans s
+          LEFT JOIN mx_packings pk ON pk.packing_id = s.scanned_ref AND s.scan_type = 'packing'
+          WHERE s.challan_id = ? AND s.deleted_at IS NULL
+        `).get(r.challan_id) as { total: number };
+        r.assembled_meters = assembled?.total || 0;
+      }
+    }
+    return { data: rows };
   });
 
   app.get("/mx/challans/:challan_id", async (req, reply) => {
@@ -157,7 +185,29 @@ export async function registerMxChallanRoutes(app: FastifyInstance, opts: { db: 
       )
       .all(c.challan_id);
 
-    return { data: { ...c, requirements, scans, location_hints: hints } };
+    // Group hints for pick_list (Godown -> Rack)
+    const pick_list = hints.reduce((acc: any[], h: any) => {
+      const godown = h.godown_name || "Unassigned";
+      const rack = h.location_hint || "Unassigned";
+      let g = acc.find((x) => x.godown === godown);
+      if (!g) {
+        g = { godown, racks: [] };
+        acc.push(g);
+      }
+      let r = g.racks.find((x: any) => x.rack === rack);
+      if (!r) {
+        r = { rack, packings: [] };
+        g.racks.push(r);
+      }
+      r.packings.push(h);
+      return acc;
+    }, []);
+
+    // Sort godowns and racks for "walking order" (alphabetical)
+    pick_list.sort((a, b) => a.godown.localeCompare(b.godown));
+    pick_list.forEach((g) => g.racks.sort((a: any, b: any) => a.rack.localeCompare(b.rack)));
+
+    return { data: { ...c, requirements, scans, location_hints: hints, pick_list } };
   });
 
   app.post("/mx/challans", async (req) => {
@@ -251,8 +301,20 @@ export async function registerMxChallanRoutes(app: FastifyInstance, opts: { db: 
     return { data: result, status: "applied" };
   });
 
+  app.delete("/mx/challans/:challan_id/scan/:scan_id", async (req, reply) => {
+    const { challan_id, scan_id } = req.params as { challan_id: string; scan_id: string };
+    const r = db.prepare(`UPDATE mx_challan_scans SET deleted_at=?, updated_at=? WHERE scan_id=? AND challan_id=?`).run(nowIso(), nowIso(), scan_id, challan_id);
+    if (r.changes === 0) return reply.code(404).send({ error: "Scan not found" });
+    return { ok: true };
+  });
+
   app.post("/mx/challans/:challan_id/dispatch", async (req, reply) => {
     const { challan_id } = req.params as { challan_id: string };
+    const body = z.object({
+      vehicle_no: z.string().optional(),
+      transporter_name: z.string().optional(),
+    }).optional().parse(req.body);
+
     const challan = db.prepare(`SELECT * FROM mx_challans WHERE challan_id=? AND deleted_at IS NULL`).get(challan_id) as any;
     if (!challan) return reply.code(404).send({ error: "Not found" });
     if (challan.status === "dispatched" || challan.status === "delivered") {
@@ -320,7 +382,9 @@ export async function registerMxChallanRoutes(app: FastifyInstance, opts: { db: 
           ).run(nowIso(), parcel.parcel_id);
         }
       }
-      db.prepare(`UPDATE mx_challans SET status='dispatched', updated_at=?, version=version+1 WHERE challan_id=?`).run(nowIso(), challan_id);
+      // Log dispatch info if schema is expanded in the future (we might need to ensure columns exist)
+      db.prepare(`UPDATE mx_challans SET status='dispatched', notes=COALESCE(notes || '\n', '') || ?, updated_at=?, version=version+1 WHERE challan_id=?`)
+        .run(`Vehicle: ${body?.vehicle_no || 'NA'} | Transporter: ${body?.transporter_name || 'NA'}`, nowIso(), challan_id);
     });
     txn();
     return { ok: true, status: "dispatched" };

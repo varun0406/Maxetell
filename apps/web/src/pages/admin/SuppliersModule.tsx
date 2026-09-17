@@ -17,6 +17,7 @@ import AddIcon from "@mui/icons-material/Add";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import { api } from "../../lib/api";
+import { CardActionArea } from "@mui/material";
 
 function TabPanel({ value, index, children }: { value: number; index: number; children: React.ReactNode }) {
   if (value !== index) return null;
