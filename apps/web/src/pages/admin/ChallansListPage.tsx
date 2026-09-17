@@ -24,6 +24,7 @@ import { printDeliveryChallan } from "../../lib/print/docs";
 export function ChallansListPage() {
   const [rows, setRows] = useState<any[]>([]);
   const [filter, setFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
   async function load() {
@@ -56,6 +57,13 @@ export function ChallansListPage() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
+          <TextField
+            size="small"
+            placeholder="Search challan or party..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{ minWidth: 200 }}
+          />
           <Autocomplete
             size="small"
             options={["All", "created", "assigned", "assembling", "dispatched", "delivered"]}
@@ -85,7 +93,10 @@ export function ChallansListPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {rows.map((c) => (
+            {rows
+              .filter((c) => c.challan_no?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                             (c.party_master_name || c.party_name || c.addr_party || "").toLowerCase().includes(searchQuery.toLowerCase()))
+              .map((c) => (
               <TableRow key={c.challan_id} hover>
                 <TableCell sx={{ fontFamily: "monospace", fontWeight: 700 }}>{c.challan_no}</TableCell>
                 <TableCell>{c.challan_date}</TableCell>
