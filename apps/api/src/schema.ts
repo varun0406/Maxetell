@@ -410,6 +410,9 @@ function migrateV2Entities(db: Db) {
   ensureColumn(db, "mx_job_work", "quality_result", "TEXT");
   ensureColumn(db, "mx_job_work", "quality_notes", "TEXT");
   ensureColumn(db, "mx_job_work", "job_work_ref", "TEXT");
+  ensureColumn(db, "mx_job_work", "transporter", "TEXT");
+  ensureColumn(db, "mx_job_work", "lr_no", "TEXT");
+  ensureColumn(db, "mx_job_work", "vehicle_no", "TEXT");
 
   // Job Worker enrichment — capacity, turnaround, GSTIN, address
   ensureColumn(db, "mx_job_workers", "gstin", "TEXT");

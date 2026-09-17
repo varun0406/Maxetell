@@ -41,10 +41,16 @@ export function JobWorkModule() {
     roll_ids: string[];
     job_worker_id: number;
     outward_date: string;
+    transporter: string;
+    lr_no: string;
+    vehicle_no: string;
   }>({
     roll_ids: [],
     job_worker_id: 0,
-    outward_date: new Date().toISOString().slice(0, 10)
+    outward_date: new Date().toISOString().slice(0, 10),
+    transporter: "",
+    lr_no: "",
+    vehicle_no: ""
   });
   const [searchWorkers, setSearchWorkers] = useState("");
   
@@ -136,6 +142,27 @@ export function JobWorkModule() {
                 fullWidth
               />
             </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField 
+                fullWidth label="Transporter Name" 
+                value={outForm.transporter} 
+                onChange={(e) => setOutForm({ ...outForm, transporter: e.target.value })} 
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <TextField 
+                fullWidth label="LR Number" 
+                value={outForm.lr_no} 
+                onChange={(e) => setOutForm({ ...outForm, lr_no: e.target.value })} 
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <TextField 
+                fullWidth label="Vehicle Number" 
+                value={outForm.vehicle_no} 
+                onChange={(e) => setOutForm({ ...outForm, vehicle_no: e.target.value })} 
+              />
+            </Grid>
             <Grid size={{ xs: 12 }}>
               <Button
                 variant="contained" fullWidth sx={{ height: 56, background: "linear-gradient(135deg, #a855f7, #ec4899)" }}
@@ -150,12 +177,15 @@ export function JobWorkModule() {
                         roll_id: rollId,
                         job_worker_id: outForm.job_worker_id,
                         outward_date: outForm.outward_date,
-                        meter_sent: roll.remaining_meterage // Dispatch entire roll
+                        meter_sent: roll.remaining_meterage, // Dispatch entire roll
+                        transporter: outForm.transporter,
+                        lr_no: outForm.lr_no,
+                        vehicle_no: outForm.vehicle_no
                       });
                     }
                   }
                   
-                  setOutForm({ ...outForm, roll_ids: [] });
+                  setOutForm({ ...outForm, roll_ids: [], transporter: "", lr_no: "", vehicle_no: "" });
                   await load();
                   setTab(1); // Jump to receive
                 }}
