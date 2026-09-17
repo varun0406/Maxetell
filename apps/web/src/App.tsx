@@ -5,12 +5,15 @@ import { AuthGate } from "./components/AuthGate.tsx";
 import { LoginPage } from "./pages/LoginPage.tsx";
 import {
   AnalyticsPage,
-  MastersPage,
-  RollsPage,
   SettingsSyncPage,
   UsersAdminPage,
 } from "./pages/admin/AdminPages.tsx";
 import { ItemCatalogPage } from "./pages/admin/ItemCatalogPage.tsx";
+import { SuppliersModule } from "./pages/admin/SuppliersModule.tsx";
+import { JobWorkModule } from "./pages/admin/JobWorkModule.tsx";
+import { PartiesModule } from "./pages/admin/PartiesModule.tsx";
+import { AgentsModule } from "./pages/admin/AgentsModule.tsx";
+import { GodownsModule } from "./pages/admin/GodownsModule.tsx";
 import { ChallansListPage } from "./pages/admin/ChallansListPage.tsx";
 import {
   AdminChallanCreatePage,
@@ -30,8 +33,11 @@ export default function App() {
             <Route index element={<ItemCatalogPage />} />
             <Route path="dashboard" element={<AnalyticsPage />} />
             <Route path="items" element={<ItemCatalogPage />} />
-            <Route path="masters" element={<MastersPage />} />
-            <Route path="rolls" element={<RollsPage />} />
+            <Route path="suppliers" element={<SuppliersModule />} />
+            <Route path="job-work" element={<JobWorkModule />} />
+            <Route path="parties" element={<PartiesModule />} />
+            <Route path="agents" element={<AgentsModule />} />
+            <Route path="godowns" element={<GodownsModule />} />
             <Route path="challans" element={<ChallansListPage />} />
             <Route path="challans/new" element={<AdminChallanCreatePage />} />
             <Route path="device" element={<SettingsSyncPage />} />

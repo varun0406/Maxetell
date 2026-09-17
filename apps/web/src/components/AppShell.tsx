@@ -14,25 +14,21 @@ import {
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
-import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
-import StyleOutlinedIcon from "@mui/icons-material/StyleOutlined";
-import ContentCutOutlinedIcon from "@mui/icons-material/ContentCutOutlined";
-import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
-import SyncOutlinedIcon from "@mui/icons-material/SyncOutlined";
-import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
-import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
-import { clearAuthToken } from "../lib/auth";
-import { useAuthGate } from "./AuthGate.tsx";
-import { useEffect } from "react";
-import { startSyncWorker } from "../offline/syncWorker";
-
-const drawerWidth = 260;
+import CategoryIcon from "@mui/icons-material/Category";
+import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing";
+import StorefrontIcon from "@mui/icons-material/Storefront";
+import SupportAgentIcon from "@mui/icons-material/SupportAgent";
+import WarehouseIcon from "@mui/icons-material/Warehouse";
 
 const nav = [
-  { to: "/", label: "Items", icon: <Inventory2OutlinedIcon /> },
   { to: "/dashboard", label: "Analytics", icon: <DashboardOutlinedIcon /> },
-  { to: "/masters", label: "Masters", icon: <CategoryOutlinedIcon /> },
-  { to: "/rolls", label: "Stock In / Lots", icon: <StyleOutlinedIcon /> },
+  { to: "/", label: "Item Catalog", icon: <CategoryIcon /> },
+  { to: "/suppliers", label: "Suppliers & Inward", icon: <LocalShippingIcon /> },
+  { to: "/job-work", label: "Job Work", icon: <PrecisionManufacturingIcon /> },
+  { to: "/parties", label: "Parties & Ship-to", icon: <StorefrontIcon /> },
+  { to: "/agents", label: "Agents", icon: <SupportAgentIcon /> },
+  { to: "/godowns", label: "Godowns", icon: <WarehouseIcon /> },
   { to: "/challans", label: "Delivery Challans", icon: <ArticleOutlinedIcon /> },
   { to: "/challans/new", label: "New Challan", icon: <ArticleOutlinedIcon /> },
   { to: "/floor/cutting", label: "Floor App", icon: <ContentCutOutlinedIcon />, highlight: true },
