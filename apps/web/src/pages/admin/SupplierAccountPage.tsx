@@ -172,16 +172,63 @@ export function SupplierAccountPage() {
         </TableContainer>
       </TabPanel>
 
-      {/* Tab 3: Ledger Placeholder */}
+      {/* Tab 3: Ledger */}
       <TabPanel value={tab} index={2}>
-        <Paper sx={{ p: 4, textAlign: "center", bgcolor: "grey.50" }}>
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            Financials Module Pending (Phase 5)
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Ledger reconciliation, debit notes, and payment tracking will be enabled in the upcoming Phase 5 rollout.
-          </Typography>
-        </Paper>
+        <Grid container spacing={3} mb={3}>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "grey.50" }}>
+              <Typography variant="caption" color="text.secondary">Total Billed (Purchase Bills)</Typography>
+              <Typography variant="h5" fontWeight={700}>
+                ₹{Number(supplier.ledger?.total_billed || 0).toLocaleString()}
+              </Typography>
+            </Paper>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "success.50" }}>
+              <Typography variant="caption" color="success.main">Total Paid</Typography>
+              <Typography variant="h5" fontWeight={700} color="success.dark">
+                ₹{Number(supplier.ledger?.total_paid || 0).toLocaleString()}
+              </Typography>
+            </Paper>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "error.50" }}>
+              <Typography variant="caption" color="error.main">Outstanding Balance</Typography>
+              <Typography variant="h5" fontWeight={700} color="error.dark">
+                ₹{Number(supplier.ledger?.outstanding || 0).toLocaleString()}
+              </Typography>
+            </Paper>
+          </Grid>
+        </Grid>
+
+        <Typography variant="h6" mb={2}>Payment History</Typography>
+        <TableContainer component={Paper} variant="outlined">
+          <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: "grey.50" }}>
+                <TableCell>Date</TableCell>
+                <TableCell>Reference No</TableCell>
+                <TableCell>Mode</TableCell>
+                <TableCell align="right">Amount</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(supplier.ledger?.payments || []).map((p: any) => (
+                <TableRow key={p.id}>
+                  <TableCell>{new Date(p.payment_date).toLocaleDateString()}</TableCell>
+                  <TableCell>{p.reference_no || "—"}</TableCell>
+                  <TableCell>{p.payment_mode || "—"}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>₹{Number(p.amount).toLocaleString()}</TableCell>
+                </TableRow>
+              ))}
+              {(!supplier.ledger?.payments || supplier.ledger.payments.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ color: "text.secondary" }}>No payments recorded.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
       </TabPanel>
     </Box>
   );

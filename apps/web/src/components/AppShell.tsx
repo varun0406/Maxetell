@@ -24,7 +24,12 @@ import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import ContentCutOutlinedIcon from "@mui/icons-material/ContentCutOutlined";
 import SyncOutlinedIcon from "@mui/icons-material/SyncOutlined";
 import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
+import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import { DashboardIcon } from "./icons/DashboardIcon.tsx";
+import { ItemCatalogIcon } from "./icons/ItemCatalogIcon.tsx";
+import { AccountsWorkspace } from "../pages/admin/AccountsWorkspace.tsx";
+import { AlertsWidget } from "./AlertsWidget.tsx";
 import { clearAuthToken } from "../lib/auth";
 import { useAuthGate } from "./AuthGate.tsx";
 import { useEffect } from "react";
@@ -34,8 +39,8 @@ import { UniversalSearchBar } from "./UniversalSearchBar";
 const drawerWidth = 260;
 
 const nav = [
-  { to: "/dashboard", label: "Analytics", icon: <DashboardOutlinedIcon /> },
-  { to: "/", label: "Item Catalog", icon: <CategoryIcon /> },
+  { to: "/dashboard", label: "Analytics", icon: <DashboardIcon /> },
+  { to: "/", label: "Item Catalog", icon: <ItemCatalogIcon /> },
   { to: "/suppliers", label: "Suppliers & Inward", icon: <LocalShippingIcon /> },
   { to: "/job-work", label: "Job Work", icon: <PrecisionManufacturingIcon /> },
   { to: "/parties", label: "Parties & Ship-to", icon: <StorefrontIcon /> },
@@ -80,6 +85,11 @@ export function AppShell() {
               Offline-first cloth stock
             </Typography>
           </Box>
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, ml: 2, display: { xs: "none", sm: "block" } }}>
+            Maxetell BRD v2
+          </Typography>
+          <UniversalSearchBar />
+          <AlertsWidget />
           <Chip size="small" label={navigator.onLine ? "Online" : "Offline"} color={navigator.onLine ? "success" : "warning"} />
           {authEnabled ? (
             <Button
@@ -94,10 +104,22 @@ export function AppShell() {
               Sign out
             </Button>
           ) : null}
-          <UniversalSearchBar />
         </Toolbar>
-        <Divider />
+        <Divider sx={{ my: 1 }} />
         <List dense sx={{ px: 1, py: 1 }}>
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/accounts"
+              selected={loc.pathname.startsWith("/accounts")}
+              sx={{ borderRadius: 2, mb: 0.5 }}
+            >
+              <ListItemIcon sx={{ minWidth: 36 }}>
+                <AccountBalanceIcon />
+              </ListItemIcon>
+              <ListItemText primary="Accounts" primaryTypographyProps={{ fontWeight: 600 }} />
+            </ListItemButton>
+          </ListItem>
           {nav
             .filter((n) => (n.adminOnly ? showUsersNav : true))
             .map((n) => (

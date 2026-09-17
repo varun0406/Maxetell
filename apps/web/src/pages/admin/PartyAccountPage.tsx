@@ -169,16 +169,93 @@ export function PartyAccountPage() {
         </TableContainer>
       </TabPanel>
 
-      {/* Tab 3: Ledger Placeholder */}
+      {/* Tab 3: Ledger */}
       <TabPanel value={tab} index={2}>
-        <Paper sx={{ p: 4, textAlign: "center", bgcolor: "grey.50" }}>
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            Financials Module Pending (Phase 5)
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Invoicing, outstanding balances, receipts, and rates will be enabled in the upcoming Phase 5 rollout.
-          </Typography>
-        </Paper>
+        <Grid container spacing={3} mb={3}>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "grey.50" }}>
+              <Typography variant="caption" color="text.secondary">Total Billed (Invoices)</Typography>
+              <Typography variant="h5" fontWeight={700}>
+                ₹{Number(party.ledger?.total_billed || 0).toLocaleString()}
+              </Typography>
+            </Paper>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "success.50" }}>
+              <Typography variant="caption" color="success.main">Total Received</Typography>
+              <Typography variant="h5" fontWeight={700} color="success.dark">
+                ₹{Number(party.ledger?.total_received || 0).toLocaleString()}
+              </Typography>
+            </Paper>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper sx={{ p: 2, textAlign: "center", bgcolor: "error.50" }}>
+              <Typography variant="caption" color="error.main">Outstanding Balance</Typography>
+              <Typography variant="h5" fontWeight={700} color="error.dark">
+                ₹{Number(party.ledger?.outstanding || 0).toLocaleString()}
+              </Typography>
+            </Paper>
+          </Grid>
+        </Grid>
+
+        <Typography variant="h6" mb={2}>Invoices & Payments</Typography>
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TableContainer component={Paper} variant="outlined">
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: "grey.50" }}>
+                    <TableCell>Invoice Date</TableCell>
+                    <TableCell>Invoice No</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(party.ledger?.invoices || []).map((inv: any) => (
+                    <TableRow key={inv.id}>
+                      <TableCell>{new Date(inv.invoice_date).toLocaleDateString()}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{inv.invoice_no}</TableCell>
+                      <TableCell align="right">₹{Number(inv.total_amount).toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                  {(!party.ledger?.invoices || party.ledger.invoices.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center" sx={{ color: "text.secondary" }}>No invoices recorded.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Grid>
+          
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TableContainer component={Paper} variant="outlined">
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: "grey.50" }}>
+                    <TableCell>Payment Date</TableCell>
+                    <TableCell>Mode</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(party.ledger?.payments || []).map((p: any) => (
+                    <TableRow key={p.id}>
+                      <TableCell>{new Date(p.payment_date).toLocaleDateString()}</TableCell>
+                      <TableCell>{p.payment_mode || "—"}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, color: "success.main" }}>+₹{Number(p.amount).toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                  {(!party.ledger?.payments || party.ledger.payments.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center" sx={{ color: "text.secondary" }}>No payments received.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Grid>
+        </Grid>
       </TabPanel>
     </Box>
   );

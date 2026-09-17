@@ -88,7 +88,18 @@ export async function registerMxMastersRoutes(app: FastifyInstance, opts: { db: 
       ORDER BY r.created_at DESC LIMIT 50
     `).all(id);
 
-    return { data: { ...supplier, active_pos, recent_rolls } };
+    // Ledger calculations
+    const payments = db.prepare(`SELECT * FROM mx_payments WHERE entity_type='supplier' AND entity_id=? AND deleted_at IS NULL ORDER BY payment_date DESC`).all(id);
+    const total_billed = db.prepare(`SELECT SUM(total_amount) as t FROM mx_purchase_bills WHERE supplier_id=? AND deleted_at IS NULL`).get(id) as any;
+    const total_paid = db.prepare(`SELECT SUM(amount) as t FROM mx_payments WHERE entity_type='supplier' AND entity_id=? AND deleted_at IS NULL`).get(id) as any;
+    const ledger = {
+      total_billed: total_billed.t || 0,
+      total_paid: total_paid.t || 0,
+      outstanding: (total_billed.t || 0) - (total_paid.t || 0),
+      payments
+    };
+
+    return { data: { ...supplier, active_pos, recent_rolls, ledger } };
   });
 
   app.post("/mx/suppliers", async (req) => {
@@ -252,7 +263,20 @@ export async function registerMxMastersRoutes(app: FastifyInstance, opts: { db: 
       ORDER BY challan_date DESC, created_at DESC LIMIT 20
     `).all(id);
 
-    return { data: { ...party, addresses, challans } };
+    // Ledger calculations
+    const invoices = db.prepare(`SELECT * FROM mx_invoices WHERE party_id=? AND deleted_at IS NULL ORDER BY invoice_date DESC`).all(id);
+    const payments = db.prepare(`SELECT * FROM mx_payments WHERE entity_type='party' AND entity_id=? AND deleted_at IS NULL ORDER BY payment_date DESC`).all(id);
+    const total_billed = db.prepare(`SELECT SUM(total_amount) as t FROM mx_invoices WHERE party_id=? AND deleted_at IS NULL`).get(id) as any;
+    const total_received = db.prepare(`SELECT SUM(amount) as t FROM mx_payments WHERE entity_type='party' AND entity_id=? AND deleted_at IS NULL`).get(id) as any;
+    const ledger = {
+      total_billed: total_billed.t || 0,
+      total_received: total_received.t || 0,
+      outstanding: (total_billed.t || 0) - (total_received.t || 0),
+      invoices,
+      payments
+    };
+
+    return { data: { ...party, addresses, challans, ledger } };
   });
 
   app.post("/mx/parties", async (req, reply) => {

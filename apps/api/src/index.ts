@@ -15,6 +15,8 @@ import { registerMxSyncRoutes } from "./routes/mx/sync.js";
 import { registerMxAnalyticsRoutes } from "./routes/mx/analytics.js";
 import { registerMxPurchaseBillRoutes } from "./routes/mx/purchase-bills.js";
 import { registerMxAliasRoutes } from "./routes/mx/aliases.js";
+import { registerMxAlertsRoutes } from "./routes/mx/alerts.js";
+import { registerMxAccountsRoutes } from "./routes/mx/accounts.js";
 
 const env = loadEnv(process.env);
 
@@ -67,5 +69,7 @@ await registerMxSyncRoutes(app, { db });
 await registerMxAnalyticsRoutes(app, { db });
 await registerMxPurchaseBillRoutes(app, { db });
 await registerMxAliasRoutes(app, { db });
+await registerMxAlertsRoutes(app, { db });
+await registerMxAccountsRoutes(app, { db });
 
 await app.listen({ port: env.PORT, host: env.HOST });

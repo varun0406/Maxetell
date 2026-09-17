@@ -6,6 +6,7 @@ export function migrate(db: Db) {
   migrateMaxwellDomain(db);
   migratePartiesAgentsReporting(db);
   migrateV2Entities(db);
+  migrateV2Phase5(db);
   seedMaxwellDemo(db);
 }
 
@@ -419,4 +420,47 @@ function migrateV2Entities(db: Db) {
   ensureColumn(db, "mx_suppliers", "address", "TEXT");
   ensureColumn(db, "mx_suppliers", "state", "TEXT");
   ensureColumn(db, "mx_suppliers", "payment_terms", "TEXT");
+}
+
+function migrateV2Phase5(db: Db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mx_invoices (
+      id               INTEGER PRIMARY KEY,
+      invoice_no       TEXT NOT NULL UNIQUE,
+      invoice_date     TEXT NOT NULL,
+      party_id         INTEGER REFERENCES mx_parties(id),
+      challan_id       TEXT REFERENCES mx_challans(challan_id),
+      total_amount     REAL NOT NULL DEFAULT 0,
+      status           TEXT NOT NULL DEFAULT 'unpaid', -- unpaid, partial, paid
+      deleted_at       TEXT,
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS mx_payments (
+      id               INTEGER PRIMARY KEY,
+      entity_type      TEXT NOT NULL CHECK(entity_type IN ('party', 'supplier', 'job_worker')),
+      entity_id        INTEGER NOT NULL,
+      payment_date     TEXT NOT NULL,
+      amount           REAL NOT NULL,
+      payment_mode     TEXT, -- bank, cash, upi
+      reference_no     TEXT,
+      notes            TEXT,
+      deleted_at       TEXT,
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS mx_alerts (
+      id               INTEGER PRIMARY KEY,
+      alert_type       TEXT NOT NULL, -- overdue_job_work, unvalidated_return, dead_stock
+      severity         TEXT NOT NULL DEFAULT 'info', -- info, warning, critical
+      message          TEXT NOT NULL,
+      entity_type      TEXT, -- job_work, roll, etc.
+      entity_id        TEXT,
+      is_resolved      INTEGER NOT NULL DEFAULT 0,
+      resolved_at      TEXT,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
 }
