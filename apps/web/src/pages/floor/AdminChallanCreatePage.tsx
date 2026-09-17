@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, Button, Chip, MenuItem, Stack, TextField, Typography, Autocomplete } from "@mui/material";
+import { Alert, Box, Button, Chip, Stack, TextField, Typography, Autocomplete } from "@mui/material";
 import { api } from "../../lib/api";
 
 export function AdminChallanCreatePage() {
