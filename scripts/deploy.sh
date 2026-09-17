@@ -14,8 +14,7 @@ git pull
 
 # 2. Build the API and Web apps
 echo "🔨 Building API and Web..."
-npm run build -w @maxwell/api
-npm run build -w @maxwell/web
+npm run build:prod
 
 # 3. Copy API files to the production directory
 echo "📂 Copying API dist files to /opt/maxwell/apps/api/dist/..."
