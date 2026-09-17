@@ -64,6 +64,7 @@ export async function registerMxSyncRoutes(app: FastifyInstance, opts: { db: Db 
             packing_date: String(p.packing_date ?? item.updated_at.slice(0, 10)),
             notes: p.notes ? String(p.notes) : null,
             device_id: body.device_id,
+            commercial_name: p.commercial_name ? String(p.commercial_name) : null,
           });
           if (result.status === "conflict") {
             const server = db.prepare(`SELECT * FROM mx_packings WHERE packing_id=?`).get(String(p.packing_id ?? item.client_id));

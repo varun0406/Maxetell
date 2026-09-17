@@ -60,6 +60,7 @@ export function CuttingStationPage() {
   const [flow, setFlow] = useState<CuttingFlow>("normal");
   const [rollScan, setRollScan] = useState("");
   const [digits, setDigits] = useState("");
+  const [commercialName, setCommercialName] = useState("");
   const [lastCut, setLastCut] = useState<number | null>(null);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [flash, setFlash] = useState(false);
@@ -185,6 +186,7 @@ export function CuttingStationPage() {
           variant_code: session.variant_code,
           packing_date,
           notes,
+          commercial_name: commercialName || undefined,
         });
       } catch {
         const res = await api.post("/mx/packings/cut", {
@@ -194,6 +196,7 @@ export function CuttingStationPage() {
           variant_code: session.variant_code,
           packing_date,
           notes,
+          commercial_name: commercialName || undefined,
         });
         packing = res.data.data;
         const refreshed = await api.get(`/mx/rolls/${session.roll_id}`);
@@ -209,6 +212,7 @@ export function CuttingStationPage() {
         color: session.color,
         quality: session.quality,
         rollShort: session.roll_short,
+        commercialName: commercialName || undefined,
       });
       sendZplImmediate(zpl);
 
@@ -381,6 +385,15 @@ export function CuttingStationPage() {
         {display}
         <span className="floor-meter-suffix"> m</span>
       </div>
+
+      <input
+        type="text"
+        className="floor-input floor-mono"
+        placeholder="Commercial Name (e.g. Carens)"
+        value={commercialName}
+        onChange={(e) => setCommercialName(e.target.value)}
+        style={{ marginBottom: 16 }}
+      />
 
       <div className="floor-numpad">
         {["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "⌫"].map((k) => (

@@ -101,6 +101,8 @@ export function PartyAccountPage() {
           <Tab label="Live Orders" />
           <Tab label="Order History" />
           <Tab label="Ledger & Financials" />
+          <Tab label="Returns" />
+          <Tab label="Rate History" />
         </Tabs>
       </Box>
 
@@ -256,6 +258,22 @@ export function PartyAccountPage() {
             </TableContainer>
           </Grid>
         </Grid>
+      </TabPanel>
+
+      {/* Tab 4: Returns */}
+      <TabPanel value={tab} index={3}>
+        <Paper sx={{ p: 4, textAlign: "center", bgcolor: "grey.50" }} variant="outlined">
+          <Typography variant="h6" color="text.secondary">Sales Returns</Typography>
+          <Typography variant="body2" color="text.secondary">Coming soon. The API currently lacks support for sales return intake.</Typography>
+        </Paper>
+      </TabPanel>
+
+      {/* Tab 5: Rate History */}
+      <TabPanel value={tab} index={4}>
+        <Paper sx={{ p: 4, textAlign: "center", bgcolor: "grey.50" }} variant="outlined">
+          <Typography variant="h6" color="text.secondary">Rate History</Typography>
+          <Typography variant="body2" color="text.secondary">Coming soon. Price tracking will be introduced in the next phase.</Typography>
+        </Paper>
       </TabPanel>
     </Box>
   );

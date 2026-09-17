@@ -15,19 +15,21 @@ export function buildPackingZpl(opts: {
   color?: string | null;
   quality?: string | null;
   rollShort?: string;
+  commercialName?: string | null;
 }): string {
   const variantLine = [opts.variantCode, opts.variantName, opts.color].filter(Boolean).join(" · ");
   const qualityLine = opts.quality ? `Q: ${opts.quality}` : "";
+  const commercialBlock = opts.commercialName ? `^CF0,48\n^FO30,85^FD${escapeZpl(opts.commercialName)}^FS\n^CF0,24\n^FO30,135^FD${escapeZpl(variantLine)}^FS` : `^CF0,32\n^FO30,75^FD${escapeZpl(variantLine)}^FS`;
+  
   return `^XA
 ^CF0,48
 ^FO30,20^FD${escapeZpl(String(opts.meters))} M^FS
-^CF0,32
-^FO30,75^FD${escapeZpl(variantLine)}^FS
+${commercialBlock}
 ^CF0,24
-^FO30,115^FD${escapeZpl(qualityLine)}^FS
-^FO30,145^FD${escapeZpl(opts.shortCode)}^FS
+^FO30,${opts.commercialName ? "165" : "115"}^FD${escapeZpl(qualityLine)}^FS
+^FO30,${opts.commercialName ? "195" : "145"}^FD${escapeZpl(opts.shortCode)}^FS
 ^BY2,2,55
-^FO30,175^BCN,55,Y,N,N
+^FO30,${opts.commercialName ? "225" : "175"}^BCN,55,Y,N,N
 ^FD${escapeZpl(opts.packingId)}^FS
 ^XZ
 `;

@@ -177,6 +177,7 @@ export async function localCutPacking(opts: {
   variant_code: string;
   packing_date: string;
   notes?: string;
+  commercial_name?: string;
 }) {
   const roll = await getLocalRoll(opts.parent_roll_id);
   if (!roll) throw new Error("Roll not on device — sync first or scan after pull");

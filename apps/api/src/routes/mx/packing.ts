@@ -21,6 +21,7 @@ export function applyCutPacking(
     packing_date: string;
     notes?: string | null;
     device_id?: string | null;
+    commercial_name?: string | null;
   },
 ): { status: "applied" | "conflict" | "rejected"; reason?: string } {
   const existing = db.prepare(`SELECT * FROM mx_packings WHERE packing_id = ?`).get(payload.packing_id) as any;
@@ -50,8 +51,8 @@ export function applyCutPacking(
   const txn = db.transaction(() => {
     db.prepare(
       `
-      INSERT INTO mx_packings(packing_id, short_code, parent_roll_id, length_meters, variant_code, status, packing_date, notes, device_id, updated_at)
-      VALUES (?,?,?,?,?,'packed',?,?,?,?)
+      INSERT INTO mx_packings(packing_id, short_code, parent_roll_id, length_meters, variant_code, status, packing_date, notes, device_id, commercial_name, updated_at)
+      VALUES (?,?,?,?,?,'packed',?,?,?,?,?)
     `,
     ).run(
       payload.packing_id,
@@ -62,6 +63,7 @@ export function applyCutPacking(
       payload.packing_date,
       payload.notes ?? null,
       payload.device_id ?? null,
+      payload.commercial_name ?? null,
       nowIso(),
     );
     db.prepare(
@@ -143,10 +145,6 @@ export async function registerMxPackingRoutes(app: FastifyInstance, opts: { db: 
     if (result.status === "rejected") return reply.code(400).send({ error: result.reason, status: result.status });
     if (result.status === "conflict") return reply.code(409).send({ error: result.reason, status: result.status });
     const row = db.prepare(`SELECT * FROM mx_packings WHERE packing_id=?`).get(body.packing_id);
-    // Set commercial_name if provided
-    if (body.commercial_name) {
-      db.prepare(`UPDATE mx_packings SET commercial_name=? WHERE packing_id=?`).run(body.commercial_name, body.packing_id);
-    }
     return { data: row, status: "applied" };
   });
 
