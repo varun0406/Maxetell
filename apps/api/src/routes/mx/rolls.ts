@@ -303,6 +303,129 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
     };
   });
 
+  app.post("/mx/job-work/bulk-return", async (req, reply) => {
+    const body = z
+      .object({
+        job_worker_id: z.number().int().positive(),
+        variant_code: z.string().min(1),
+        total_meter_returned: z.number().positive(),
+        roll_count: z.number().int().positive().default(1),
+        inward_date: z.string().min(1),
+        quality_result: z.enum(["accepted", "defect", "rejected"]).optional(),
+        quality_notes: z.string().optional(),
+        declare_shortage: z.number().nonnegative().optional().default(0),
+      })
+      .parse(req.body);
+
+    // Fetch open outward records for this worker and variant (FIFO)
+    const openOutwards = db.prepare(`
+      SELECT j.*, r.short_code, r.supplier_id 
+      FROM mx_job_work j
+      JOIN mx_rolls r ON r.roll_id = j.roll_id
+      WHERE j.job_worker_id = ? AND r.variant_code = ? AND j.processed_state = 'outward' AND j.deleted_at IS NULL
+      ORDER BY j.outward_date ASC, j.created_at ASC
+    `).all(body.job_worker_id, body.variant_code) as any[];
+
+    if (openOutwards.length === 0) {
+      return reply.code(400).send({ error: "No open job work found for this variant and job worker" });
+    }
+
+    let remainingToReturn = body.total_meter_returned;
+    let remainingShortage = body.declare_shortage;
+    let totalPendingMeters = openOutwards.reduce((acc, curr) => acc + (curr.meter_sent - curr.meter_returned), 0);
+
+    if (remainingToReturn + remainingShortage > totalPendingMeters) {
+      return reply.code(400).send({ error: `Cannot settle ${remainingToReturn + remainingShortage}m. Only ${totalPendingMeters}m pending.` });
+    }
+
+    const metersPerRoll = body.total_meter_returned / body.roll_count;
+    const splitRolls: any[] = [];
+    const baseShortCode = openOutwards[0].short_code; // just use the oldest roll's shortcode as base
+
+    const txn = db.transaction(() => {
+      // 1. Generate Physical Rolls (split rolls)
+      for (let i = 0; i < body.roll_count; i++) {
+        const splitRollId = crypto.randomUUID();
+        const splitShortCode = `${baseShortCode}-B${Date.now().toString().slice(-4)}-${i+1}`;
+        db.prepare(`
+          INSERT INTO mx_rolls(roll_id, short_code, lot_no, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, updated_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        `).run(
+          splitRollId, splitShortCode, splitShortCode, openOutwards[0].supplier_id, body.variant_code, 
+          metersPerRoll, metersPerRoll, 'in_cutting', body.inward_date, null, nowIso()
+        );
+        splitRolls.push(splitRollId);
+      }
+
+      // 2. FIFO Settlement against outward records
+      for (const jw of openOutwards) {
+        if (remainingToReturn <= 0 && remainingShortage <= 0) break;
+
+        const pendingOnThisRecord = jw.meter_sent - jw.meter_returned;
+        if (pendingOnThisRecord <= 0) continue;
+
+        // How much of the return can we apply here?
+        const returnToApply = Math.min(pendingOnThisRecord, remainingToReturn);
+        remainingToReturn -= returnToApply;
+
+        // How much of the shortage can we apply here?
+        const remainingPendingAfterReturn = pendingOnThisRecord - returnToApply;
+        const shortageToApply = Math.min(remainingPendingAfterReturn, remainingShortage);
+        remainingShortage -= shortageToApply;
+
+        const newMeterReturned = jw.meter_returned + returnToApply;
+        
+        // Is this record fully settled? (if newMeterReturned + applied shortage >= meter_sent)
+        // Or if we are applying the final bit of return and shortage and they explicitly declared it.
+        // Actually, if we apply ANY shortage, it means we are closing this record (because shortage is a write-off).
+        // Let's just close it if (returnToApply + shortageToApply == pendingOnThisRecord) OR (shortageToApply > 0).
+        const isFullySettled = (newMeterReturned + shortageToApply >= jw.meter_sent);
+
+        // Record the return in mx_job_work_returns
+        // Since we created bulk rolls, we just map the return to the first generated roll, or null?
+        // Wait, mx_job_work_returns requires returned_roll_id. We can use splitRolls[0].
+        if (returnToApply > 0) {
+          db.prepare(`
+            INSERT INTO mx_job_work_returns(job_work_id, returned_roll_id, meter_returned, inward_date, quality_result, quality_notes)
+            VALUES (?,?,?,?,?,?)
+          `).run(jw.job_work_id, splitRolls[0], returnToApply, body.inward_date, body.quality_result ?? null, body.quality_notes ?? null);
+        }
+
+        // Update mx_job_work
+        if (isFullySettled) {
+           db.prepare(`
+            UPDATE mx_job_work SET
+              meter_returned=?, inward_date=?, processed_state='inward',
+              shortage_meters=shortage_meters + ?,
+              received_by='warehouse',
+              received_confirmed_at=?,
+              quality_result=?,
+              quality_notes=?,
+              updated_at=?, version=version+1
+            WHERE job_work_id=?
+          `).run(newMeterReturned, body.inward_date, shortageToApply, nowIso(), body.quality_result ?? null, body.quality_notes ?? null, nowIso(), jw.job_work_id);
+        } else {
+           db.prepare(`
+            UPDATE mx_job_work SET
+              meter_returned=?,
+              updated_at=?, version=version+1
+            WHERE job_work_id=?
+          `).run(newMeterReturned, nowIso(), jw.job_work_id);
+        }
+      }
+    });
+
+    txn();
+
+    return {
+      ok: true,
+      data: {
+        settled_meterage: body.total_meter_returned,
+        rolls_generated: splitRolls.length
+      }
+    };
+  });
+
   app.post("/mx/job-work/:id/confirm-receive", async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = z.object({ received_by: z.string().optional() }).parse(req.body ?? {});

@@ -13,6 +13,10 @@ import {
   TextField,
   Typography,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
@@ -44,6 +48,19 @@ export function JobWorkModule() {
   const [searchWorkers, setSearchWorkers] = useState("");
   const [qualityResults, setQualityResults] = useState<Record<string, string>>({});
   const [isFinals, setIsFinals] = useState<Record<string, boolean>>({});
+  
+  // Bulk Receive State
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkForm, setBulkForm] = useState({
+    job_worker_id: 0,
+    variant_code: "",
+    total_meter_returned: "",
+    roll_count: 1,
+    declare_shortage: 0,
+    quality_result: "accepted",
+    quality_notes: "",
+  });
+
   const navigate = useNavigate();
 
   async function load() {
@@ -145,10 +162,19 @@ export function JobWorkModule() {
       </TabPanel>
 
       <TabPanel value={tab} index={1}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6">Receive Returns</Typography>
-          <TextField size="small" placeholder="Search by roll or processor..." value={searchJobs} onChange={(e) => setSearchJobs(e.target.value)} sx={{ width: 250 }} />
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+          <Box>
+            <Typography variant="h6">Receive Bulk Delivery</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Record a consolidated receipt from a job worker. We will automatically settle the meters against their oldest open outward records.
+            </Typography>
+          </Box>
+          <Button variant="contained" color="secondary" onClick={() => setBulkModalOpen(true)}>
+            + Receive Bulk Delivery
+          </Button>
         </Stack>
+
+        <Typography variant="h6" mt={4} mb={2}>Pending Individual Rolls</Typography>
         <Grid container spacing={2}>
           {openJobs
             .filter((j) => j.roll_short?.toLowerCase().includes(searchJobs.toLowerCase()) || j.worker_name?.toLowerCase().includes(searchJobs.toLowerCase()))
@@ -167,70 +193,103 @@ export function JobWorkModule() {
                   <Typography fontWeight={600}>{j.worker_name}</Typography>
                 </Box>
                 <Box sx={{ textAlign: "right" }}>
-                  <Typography variant="body2" color="text.secondary">Meters Sent</Typography>
-                  <Typography fontWeight={700} color="warning.main">{j.meter_sent}m</Typography>
+                  <Typography variant="body2" color="text.secondary">Pending</Typography>
+                  <Typography fontWeight={700} color="warning.main">{(j.meter_sent - (j.meter_returned ?? 0)).toFixed(1)}m</Typography>
                 </Box>
-                
-                <Box sx={{ width: "1px", height: 40, bgcolor: "divider", mx: 1 }} />
-                
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <TextField
-                    size="small"
-                    type="number"
-                    label="Return m"
-                    sx={{ width: 100 }}
-                    value={meters[j.job_work_id] ?? j.meter_sent}
-                    onChange={(e) => setMeters({ ...meters, [j.job_work_id]: Number(e.target.value) })}
-                  />
-                  <TextField
-                    select
-                    size="small"
-                    label="Quality"
-                    sx={{ width: 120 }}
-                    value={qualityResults[j.job_work_id] || "accepted"}
-                    onChange={(e) => setQualityResults({ ...qualityResults, [j.job_work_id]: e.target.value })}
-                  >
-                    <MenuItem value="accepted">Accepted</MenuItem>
-                    <MenuItem value="defect">Defect</MenuItem>
-                    <MenuItem value="rejected">Rejected</MenuItem>
-                  </TextField>
-                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={isFinals[j.job_work_id] ?? true}
-                      onChange={(e) => setIsFinals({ ...isFinals, [j.job_work_id]: e.target.checked })}
-                      style={{ marginRight: 6 }}
-                    />
-                    Final Return?
-                  </label>
-                  <Button
-                    variant="contained" color="secondary"
-                    onClick={async () => {
-                      await api.post(`/mx/job-work/${j.job_work_id}/return`, {
-                        meter_returned: meters[j.job_work_id] ?? j.meter_sent,
-                        inward_date: new Date().toISOString().slice(0, 10),
-                        received_by: "warehouse",
-                        confirm_receive: true,
-                        quality_result: qualityResults[j.job_work_id] || "accepted",
-                        is_final: isFinals[j.job_work_id] ?? true,
-                      });
-                      await load();
-                    }}
-                  >
-                    Confirm Receive
-                  </Button>
-                </Stack>
               </Paper>
             </Grid>
           ))}
           {!openJobs.length && (
-            <Grid  size={{ xs: 12 }}>
+            <Grid size={{ xs: 12 }}>
               <Paper elevation={0} sx={{ p: 6, textAlign: "center", border: "1px dashed rgba(0,0,0,0.1)", borderRadius: 4 }}>
                 <Typography color="text.secondary">No open job-work pending return.</Typography>
               </Paper>
             </Grid>
           )}
         </Grid>
+
+        <Dialog open={bulkModalOpen} onClose={() => setBulkModalOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle fontWeight={800}>Receive Bulk Delivery</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={3} mt={1}>
+              <Autocomplete
+                options={workers}
+                getOptionLabel={(w) => w.name}
+                value={workers.find(w => w.id === bulkForm.job_worker_id) || null}
+                onChange={(_, v) => setBulkForm({ ...bulkForm, job_worker_id: v?.id || 0, variant_code: "" })}
+                renderInput={(params) => <TextField {...params} label="Select Processor" required />}
+              />
+              
+              <Autocomplete
+                options={Array.from(new Set(openJobs.filter(j => j.job_worker_id === bulkForm.job_worker_id).map(j => j.variant_code)))}
+                value={bulkForm.variant_code}
+                onChange={(_, v) => setBulkForm({ ...bulkForm, variant_code: v || "" })}
+                renderInput={(params) => <TextField {...params} label="Variant Received" required helperText="Only variants currently open with this processor" />}
+              />
+
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Total Meters Received"
+                  type="number"
+                  required
+                  value={bulkForm.total_meter_returned}
+                  onChange={(e) => setBulkForm({ ...bulkForm, total_meter_returned: e.target.value })}
+                />
+                <TextField
+                  fullWidth
+                  label="Number of Physical Rolls"
+                  type="number"
+                  required
+                  value={bulkForm.roll_count}
+                  onChange={(e) => setBulkForm({ ...bulkForm, roll_count: Number(e.target.value) })}
+                  helperText="We will generate barcodes for these."
+                />
+              </Stack>
+
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Quality Result"
+                  value={bulkForm.quality_result}
+                  onChange={(e) => setBulkForm({ ...bulkForm, quality_result: e.target.value })}
+                >
+                  <MenuItem value="accepted">Accepted</MenuItem>
+                  <MenuItem value="defect">Defect</MenuItem>
+                  <MenuItem value="rejected">Rejected</MenuItem>
+                </TextField>
+                <TextField
+                  fullWidth
+                  label="Declared Shortage (Wastage) in m"
+                  type="number"
+                  value={bulkForm.declare_shortage}
+                  onChange={(e) => setBulkForm({ ...bulkForm, declare_shortage: Number(e.target.value) })}
+                  helperText="Will be written off."
+                />
+              </Stack>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setBulkModalOpen(false)}>Cancel</Button>
+            <Button
+              variant="contained" color="secondary"
+              disabled={!bulkForm.job_worker_id || !bulkForm.variant_code || !bulkForm.total_meter_returned}
+              onClick={async () => {
+                await api.post("/mx/job-work/bulk-return", {
+                  ...bulkForm,
+                  total_meter_returned: Number(bulkForm.total_meter_returned),
+                  inward_date: new Date().toISOString().slice(0, 10),
+                });
+                setBulkModalOpen(false);
+                setBulkForm({ ...bulkForm, total_meter_returned: "", roll_count: 1, declare_shortage: 0 });
+                await load();
+              }}
+            >
+              Submit & Auto-Settle
+            </Button>
+          </DialogActions>
+        </Dialog>
       </TabPanel>
 
       <TabPanel value={tab} index={2}>
