@@ -84,15 +84,58 @@ export async function registerMxAccountsRoutes(app: FastifyInstance, opts: { db:
     `).all() as any[];
 
     // AP: Suppliers
-    const ap = db.prepare(`
+    const apSuppliers = db.prepare(`
       SELECT 
-        s.id, s.name,
+        s.id, s.name, 'Supplier' as role,
         COALESCE((SELECT SUM(total_amount) FROM mx_purchase_bills WHERE supplier_id=s.id AND deleted_at IS NULL), 0) as total_billed,
         COALESCE((SELECT SUM(amount) FROM mx_payments WHERE entity_type='supplier' AND entity_id=s.id AND deleted_at IS NULL), 0) as total_paid
       FROM mx_suppliers s
       WHERE s.deleted_at IS NULL
     `).all() as any[];
 
-    return { data: { receivables: ar, payables: ap } };
+    // AP: Job Workers
+    const apJobWorkers = db.prepare(`
+      SELECT 
+        jw.id, jw.name, 'Job Worker' as role,
+        COALESCE((SELECT SUM(total_amount) FROM mx_job_work_bills WHERE job_worker_id=jw.id AND deleted_at IS NULL), 0) as total_billed,
+        COALESCE((SELECT SUM(amount) FROM mx_payments WHERE entity_type='job_worker' AND entity_id=jw.id AND deleted_at IS NULL), 0) as total_paid
+      FROM mx_job_workers jw
+      WHERE jw.deleted_at IS NULL
+    `).all() as any[];
+
+    return { data: { receivables: ar, payables: [...apSuppliers, ...apJobWorkers] } };
+  });
+
+  // Job Work Bills
+  app.get("/mx/accounts/job-work-bills", async () => {
+    return {
+      data: db.prepare(`
+        SELECT b.*, jw.name as job_worker_name
+        FROM mx_job_work_bills b
+        LEFT JOIN mx_job_workers jw ON b.job_worker_id = jw.id
+        WHERE b.deleted_at IS NULL
+        ORDER BY b.bill_date DESC, b.created_at DESC
+      `).all()
+    };
+  });
+
+  app.post("/mx/accounts/job-work-bills", async (req) => {
+    const body = z.object({
+      bill_no: z.string().trim().min(1),
+      job_worker_id: z.number().int().positive(),
+      bill_date: z.string().trim().min(1),
+      total_amount: z.number().min(0),
+      notes: z.string().optional()
+    }).parse(req.body);
+
+    const id = Number(
+      db.prepare(`
+        INSERT INTO mx_job_work_bills (bill_no, job_worker_id, bill_date, total_amount, notes)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(body.bill_no, body.job_worker_id, body.bill_date, body.total_amount, body.notes ?? null).lastInsertRowid
+    );
+
+    return { data: { id, ...body } };
   });
 }
+

@@ -7,6 +7,7 @@ export function migrate(db: Db) {
   migratePartiesAgentsReporting(db);
   migrateV2Entities(db);
   migrateV2Phase5(db);
+  migrateV2Phase7(db);
   seedMaxwellDemo(db);
 }
 
@@ -463,4 +464,22 @@ function migrateV2Phase5(db: Db) {
       created_at       TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+}
+
+function migrateV2Phase7(db: Db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mx_job_work_bills (
+      id               INTEGER PRIMARY KEY,
+      job_worker_id    INTEGER NOT NULL REFERENCES mx_job_workers(id),
+      bill_no          TEXT NOT NULL,
+      bill_date        TEXT NOT NULL,
+      total_amount     REAL NOT NULL,
+      notes            TEXT,
+      deleted_at       TEXT,
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  ensureColumn(db, "mx_rolls", "purchase_price", "REAL");
 }

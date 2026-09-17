@@ -39,6 +39,8 @@ export function SuppliersModule() {
     original_meterage: 100,
     received_date: new Date().toISOString().slice(0, 10),
     notes: "",
+    purchase_bill_no: "",
+    purchase_price: 0,
   });
   const [searchSuppliers, setSearchSuppliers] = useState("");
   const [searchRolls, setSearchRolls] = useState("");
@@ -138,13 +140,32 @@ export function SuppliersModule() {
                 onChange={(e) => setRollForm({ ...rollForm, received_date: e.target.value })} 
               />
             </Grid>
+            <Grid  size={{ xs: 12, sm: 6, md: 4 }}>
+              <TextField 
+                fullWidth label="Purchase Bill No" 
+                value={rollForm.purchase_bill_no} 
+                onChange={(e) => setRollForm({ ...rollForm, purchase_bill_no: e.target.value })} 
+                placeholder="e.g. INV-2024-001"
+              />
+            </Grid>
+            <Grid  size={{ xs: 12, sm: 6, md: 4 }}>
+              <TextField 
+                fullWidth type="number" label="Price per Meter (₹)" 
+                value={rollForm.purchase_price} 
+                onChange={(e) => setRollForm({ ...rollForm, purchase_price: Number(e.target.value) })} 
+              />
+            </Grid>
             <Grid  size={{ xs: 12, md: 4 }}>
               <Button
                 variant="contained" fullWidth sx={{ height: 56, background: "linear-gradient(135deg, #0ea5e9, #6366f1)" }}
                 onClick={async () => {
                   if (!rollForm.lot_no.trim() || !rollForm.supplier_id || !rollForm.variant_code) return;
-                  await api.post("/mx/rolls", rollForm);
-                  setRollForm({ ...rollForm, lot_no: "" });
+                  await api.post("/mx/rolls", {
+                    ...rollForm,
+                    purchase_bill_no: rollForm.purchase_bill_no || undefined,
+                    purchase_price: rollForm.purchase_price || undefined,
+                  });
+                  setRollForm({ ...rollForm, lot_no: "", purchase_bill_no: "", purchase_price: 0 });
                   await load();
                   setTab(2); // Jump to history
                 }}

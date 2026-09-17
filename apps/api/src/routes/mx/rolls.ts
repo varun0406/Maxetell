@@ -69,7 +69,8 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
         original_meterage: z.number().positive(),
         received_date: z.string().min(1),
         notes: z.string().optional(),
-        purchase_bill_id: z.number().int().positive().optional(),
+        purchase_bill_no: z.string().trim().optional(),
+        purchase_price: z.number().nonnegative().optional(),
       })
       .parse(req.body);
 
@@ -80,10 +81,22 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
     if (dup) return reply.code(409).send({ error: `Lot no ${lot} already exists` });
 
     const job_id = body.roll_id ?? crypto.randomUUID();
+    let bill_id: number | null = null;
+    if (body.purchase_bill_no) {
+      const existingBill = db.prepare(`SELECT id FROM mx_purchase_bills WHERE bill_no = ? AND supplier_id = ? AND deleted_at IS NULL`).get(body.purchase_bill_no, body.supplier_id) as { id: number } | undefined;
+      if (existingBill) {
+        bill_id = existingBill.id;
+        // Optional: update total_meterage and total_amount of the bill if needed
+        db.prepare(`UPDATE mx_purchase_bills SET total_meterage = COALESCE(total_meterage, 0) + ?, total_amount = COALESCE(total_amount, 0) + ? WHERE id = ?`).run(body.original_meterage, body.original_meterage * (body.purchase_price || 0), bill_id);
+      } else {
+        bill_id = Number(db.prepare(`INSERT INTO mx_purchase_bills (supplier_id, bill_no, bill_date, total_meterage, total_amount) VALUES (?, ?, ?, ?, ?)`).run(body.supplier_id, body.purchase_bill_no, body.received_date, body.original_meterage, body.original_meterage * (body.purchase_price || 0)).lastInsertRowid);
+      }
+    }
+
     db.prepare(
       `
-      INSERT INTO mx_rolls(roll_id, short_code, lot_no, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, purchase_bill_id, updated_at)
-      VALUES (?,?,?,?,?,?,?,'inward',?,?,?,?)
+      INSERT INTO mx_rolls(roll_id, short_code, lot_no, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, purchase_bill_id, purchase_price, updated_at)
+      VALUES (?,?,?,?,?,?,?,'inward',?,?,?,?,?)
     `,
     ).run(
       job_id,
@@ -95,7 +108,8 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
       body.original_meterage,
       body.received_date,
       body.notes ?? null,
-      body.purchase_bill_id ?? null,
+      bill_id,
+      body.purchase_price ?? null,
       nowIso(),
     );
     return {
