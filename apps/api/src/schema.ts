@@ -8,6 +8,7 @@ export function migrate(db: Db) {
   migrateV2Entities(db);
   migrateV2Phase5(db);
   migrateV2Phase7(db);
+  migrateV2Phase9(db);
   seedMaxwellDemo(db);
 }
 
@@ -482,4 +483,22 @@ function migrateV2Phase7(db: Db) {
   `);
 
   ensureColumn(db, "mx_rolls", "purchase_price", "REAL");
+}
+
+function migrateV2Phase9(db: Db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mx_job_work_returns (
+      id               INTEGER PRIMARY KEY,
+      job_work_id      TEXT NOT NULL REFERENCES mx_job_work(job_work_id),
+      returned_roll_id TEXT NOT NULL REFERENCES mx_rolls(roll_id),
+      meter_returned   REAL NOT NULL CHECK(meter_returned > 0),
+      inward_date      TEXT NOT NULL,
+      quality_result   TEXT,
+      quality_notes    TEXT,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  ensureColumn(db, "mx_job_work", "shortage_meters", "REAL DEFAULT 0");
+  ensureColumn(db, "mx_job_work", "received_by", "TEXT");
+  ensureColumn(db, "mx_job_work", "received_confirmed_at", "TEXT");
 }

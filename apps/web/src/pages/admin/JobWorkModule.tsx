@@ -43,6 +43,7 @@ export function JobWorkModule() {
   const [searchJobs, setSearchJobs] = useState("");
   const [searchWorkers, setSearchWorkers] = useState("");
   const [qualityResults, setQualityResults] = useState<Record<string, string>>({});
+  const [isFinals, setIsFinals] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
   async function load() {
@@ -193,6 +194,15 @@ export function JobWorkModule() {
                     <MenuItem value="defect">Defect</MenuItem>
                     <MenuItem value="rejected">Rejected</MenuItem>
                   </TextField>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={isFinals[j.job_work_id] ?? true}
+                      onChange={(e) => setIsFinals({ ...isFinals, [j.job_work_id]: e.target.checked })}
+                      style={{ marginRight: 6 }}
+                    />
+                    Final Return?
+                  </label>
                   <Button
                     variant="contained" color="secondary"
                     onClick={async () => {
@@ -202,6 +212,7 @@ export function JobWorkModule() {
                         received_by: "warehouse",
                         confirm_receive: true,
                         quality_result: qualityResults[j.job_work_id] || "accepted",
+                        is_final: isFinals[j.job_work_id] ?? true,
                       });
                       await load();
                     }}

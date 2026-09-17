@@ -156,7 +156,19 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
       ORDER BY j.outward_date DESC
     `,
       )
-      .all();
+      .all() as any[];
+      
+    const jwIds = rows.map((r) => r.job_work_id);
+    let returns: any[] = [];
+    if (jwIds.length > 0) {
+      const placeholders = jwIds.map(() => "?").join(",");
+      returns = db.prepare(`SELECT * FROM mx_job_work_returns WHERE job_work_id IN (${placeholders}) ORDER BY created_at ASC`).all(...jwIds) as any[];
+    }
+    
+    for (const r of rows) {
+      r.returns = returns.filter((ret) => ret.job_work_id === r.job_work_id);
+    }
+    
     return { data: rows };
   });
 
@@ -199,61 +211,94 @@ export async function registerMxRollsRoutes(app: FastifyInstance, opts: { db: Db
     const { id } = req.params as { id: string };
     const body = z
       .object({
-        meter_returned: z.number().positive(),
+        meter_returned: z.number().nonnegative(),
         inward_date: z.string().min(1),
         notes: z.string().optional(),
         received_by: z.string().optional(),
         confirm_receive: z.boolean().optional().default(true),
         quality_result: z.enum(["accepted", "defect", "rejected"]).optional(),
         quality_notes: z.string().optional(),
+        is_final: z.boolean().optional().default(true),
       })
       .parse(req.body);
 
     const jw = db.prepare(`SELECT * FROM mx_job_work WHERE job_work_id=? AND deleted_at IS NULL`).get(id) as any;
     if (!jw) return reply.code(404).send({ error: "Job work not found" });
-    if (jw.processed_state !== "outward") return reply.code(400).send({ error: "Already returned" });
+    if (jw.processed_state !== "outward") return reply.code(400).send({ error: "Already completed or returned" });
 
-    const shortage = Math.max(0, Number(jw.meter_sent) - body.meter_returned);
+    const roll = db.prepare(`SELECT * FROM mx_rolls WHERE roll_id=?`).get(jw.roll_id) as any;
+    
+    const newMeterReturned = Number(jw.meter_returned) + body.meter_returned;
+    const shortage = body.is_final ? Math.max(0, Number(jw.meter_sent) - newMeterReturned) : 0;
     const confirmedAt = body.confirm_receive ? nowIso() : null;
 
+    let splitRollId = null;
+    let splitShortCode = null;
+    if (body.meter_returned > 0) {
+      splitRollId = crypto.randomUUID();
+      // find how many returns already exist to append -P1, -P2 etc.
+      const returnCount = (db.prepare(`SELECT COUNT(*) as c FROM mx_job_work_returns WHERE job_work_id=?`).get(id) as any).c;
+      splitShortCode = `${roll.short_code}-P${returnCount + 1}`;
+    }
+
     const txn = db.transaction(() => {
-      db.prepare(
-        `
-        UPDATE mx_job_work SET
-          meter_returned=?, inward_date=?, processed_state='inward',
-          notes=COALESCE(?, notes),
-          shortage_meters=?,
-          received_by=?,
-          received_confirmed_at=?,
-          quality_result=?,
-          quality_notes=?,
-          updated_at=?, version=version+1
-        WHERE job_work_id=?
-      `,
-      ).run(
-        body.meter_returned,
-        body.inward_date,
-        body.notes ?? null,
-        shortage,
-        body.received_by ?? null,
-        confirmedAt,
-        body.quality_result ?? null,
-        body.quality_notes ?? null,
-        nowIso(),
-        id,
-      );
-      db.prepare(
-        `UPDATE mx_rolls SET remaining_meterage = remaining_meterage + ?, status='in_cutting', updated_at=?, version=version+1 WHERE roll_id=?`,
-      ).run(body.meter_returned, nowIso(), jw.roll_id);
+      // 1. Create a split roll if returning material
+      if (splitRollId && splitShortCode) {
+        db.prepare(`
+          INSERT INTO mx_rolls(roll_id, short_code, lot_no, supplier_id, variant_code, original_meterage, remaining_meterage, status, received_date, notes, updated_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        `).run(
+          splitRollId, splitShortCode, splitShortCode, roll.supplier_id, roll.variant_code, 
+          body.meter_returned, body.meter_returned, 'in_cutting', body.inward_date, body.notes ?? null, nowIso()
+        );
+        
+        // Insert into mx_job_work_returns
+        db.prepare(`
+          INSERT INTO mx_job_work_returns(job_work_id, returned_roll_id, meter_returned, inward_date, quality_result, quality_notes)
+          VALUES (?,?,?,?,?,?)
+        `).run(
+          id, splitRollId, body.meter_returned, body.inward_date, body.quality_result ?? null, body.quality_notes ?? null
+        );
+      }
+
+      // 2. Update job work record
+      if (body.is_final) {
+        db.prepare(`
+          UPDATE mx_job_work SET
+            meter_returned=?, inward_date=?, processed_state='inward',
+            notes=COALESCE(?, notes),
+            shortage_meters=?,
+            received_by=?,
+            received_confirmed_at=?,
+            quality_result=?,
+            quality_notes=?,
+            updated_at=?, version=version+1
+          WHERE job_work_id=?
+        `).run(
+          newMeterReturned, body.inward_date, body.notes ?? null, shortage, body.received_by ?? null, confirmedAt, body.quality_result ?? null, body.quality_notes ?? null, nowIso(), id
+        );
+      } else {
+        db.prepare(`
+          UPDATE mx_job_work SET
+            meter_returned=?,
+            notes=COALESCE(?, notes),
+            updated_at=?, version=version+1
+          WHERE job_work_id=?
+        `).run(
+          newMeterReturned, body.notes ?? null, nowIso(), id
+        );
+      }
     });
     txn();
     return {
       ok: true,
       data: {
         meter_sent: jw.meter_sent,
-        meter_returned: body.meter_returned,
+        meter_returned: newMeterReturned,
         shortage_meters: shortage,
         received_confirmed_at: confirmedAt,
+        split_roll_id: splitRollId,
+        split_short_code: splitShortCode,
       },
     };
   });
