@@ -20,6 +20,17 @@ import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturi
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import SupportAgentIcon from "@mui/icons-material/SupportAgent";
 import WarehouseIcon from "@mui/icons-material/Warehouse";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
+import ContentCutOutlinedIcon from "@mui/icons-material/ContentCutOutlined";
+import SyncOutlinedIcon from "@mui/icons-material/SyncOutlined";
+import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import { clearAuthToken } from "../lib/auth";
+import { useAuthGate } from "./AuthGate.tsx";
+import { useEffect } from "react";
+import { startSyncWorker } from "../offline/syncWorker";
+
+const drawerWidth = 260;
 
 const nav = [
   { to: "/dashboard", label: "Analytics", icon: <DashboardOutlinedIcon /> },
