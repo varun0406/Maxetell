@@ -125,7 +125,7 @@ export function DispatcherBoard() {
                         <LinearProgress variant="determinate" value={progress} sx={{ height: 8, borderRadius: 4, mb: 1 }} />
                         
                         <Typography variant="caption" display="block" color="text.secondary" mb={1}>
-                          {c.assembled_meters.toFixed(1)}m / {c.total_required_meters || "?"}m assembled ({c.scan_count} scans)
+                          {(c.assembled_meters || 0).toFixed(1)}m / {c.total_required_meters || "?"}m assembled ({c.scan_count} scans)
                         </Typography>
                         
                         <Button size="small" variant="contained" sx={{ mt: 1, boxShadow: "none" }} fullWidth onClick={() => navigate(`/floor/challans/${c.challan_id}`)}>

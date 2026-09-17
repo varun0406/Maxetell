@@ -158,7 +158,7 @@ export function SupplierAccountPage() {
                   <TableCell sx={{ fontFamily: "monospace", fontWeight: 700 }}>{r.short_code}</TableCell>
                   <TableCell>{r.item_name} • {r.variant_code}</TableCell>
                   <TableCell>{r.lot_no || "—"}</TableCell>
-                  <TableCell align="right">{r.original_meters.toFixed(1)}</TableCell>
+                  <TableCell align="right">{(r.original_meters || 0).toFixed(1)}</TableCell>
                   <TableCell>{new Date(r.created_at).toLocaleDateString()}</TableCell>
                 </TableRow>
               ))}
