@@ -121,9 +121,9 @@ export function PartiesModule() {
                     variant="contained" color="success" fullWidth sx={{ height: 40 }}
                     onClick={async () => {
                       await api.post("/mx/addresses", {
+                        ...shipForm,
                         party_id: openParty.id,
                         party_name: openParty.name,
-                        ...shipForm,
                       });
                       setShipForm({ party_id: 0, party_name: "", address_line: "", city: "", state: "", phone: "", label: "Deliver to" });
                       setShowNewAddress(false);
